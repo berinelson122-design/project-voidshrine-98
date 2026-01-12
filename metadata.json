@@ -1,0 +1,5 @@
+{
+  "name": "Project SHRINE-98",
+  "description": "A PC-98 inspired Vertical Danmaku (Bullet Hell) engine featuring procedural graphics, FM-synth audio emulation, and object-pooled entity management.",
+  "requestFramePermissions": []
+}
