@@ -1,20 +1,18 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+## How to actually run this masterpiece:
 
-# Run and deploy your AI Studio app
+Since this isn't a Unity game and was made with React + Vite, you need Node.js to run the dev environment.
 
-This contains everything you need to run your app locally.
+1. **Clone it:**
+   `git clone https://github.com/berinelson122-design/project-shrine-98.git`
 
-View your app in AI Studio: https://ai.studio/apps/drive/1SwjkKJ6hk7iOFVKMOUtZoEa0pH68Pz9o
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
+2. **Install the dependencies:**
+   `cd project-shrine-98`
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+
+3. **Start the engine:**
    `npm run dev`
+
+4. **Open it:**
+   It usually runs on a local server `http://localhost:5173`.
+
+**Note:** If you want to use the build version (the one on Itch), just run `npm run build` and serve the `dist` folder.
