@@ -1,30 +1,28 @@
 import { useEffect, useRef } from 'react';
 
 export const useGameLoop = (
-  callback: (deltaTime: number) => void,
+  callback: (dt: number) => void,
   isRunning: boolean
 ) => {
-  const requestRef = useRef<number>(0);
-  const previousTimeRef = useRef<number>(0);
+  const reqIdRef = useRef<number>(0); // Fix: Initialize with 0
+  const prevTimeRef = useRef<number>(0); // Fix: Initialize with 0
 
-  const animate = (time: number) => {
-    if (previousTimeRef.current !== undefined) {
-      const deltaTime = time - previousTimeRef.current;
-      callback(deltaTime);
+  const loop = (time: number) => {
+    if (prevTimeRef.current !== 0) { // Check against 0
+      const dt = time - prevTimeRef.current;
+      callback(dt);
     }
-    previousTimeRef.current = time;
-    if (isRunning) {
-      requestRef.current = requestAnimationFrame(animate);
-    }
+    prevTimeRef.current = time;
+    reqIdRef.current = requestAnimationFrame(loop);
   };
 
   useEffect(() => {
     if (isRunning) {
-      requestRef.current = requestAnimationFrame(animate);
+      reqIdRef.current = requestAnimationFrame(loop);
     } else {
-      cancelAnimationFrame(requestRef.current);
-      previousTimeRef.current = 0;
+      cancelAnimationFrame(reqIdRef.current);
+      prevTimeRef.current = 0;
     }
-    return () => cancelAnimationFrame(requestRef.current);
-  }, [isRunning, callback]); // Callback should be memoized by consumer
+    return () => cancelAnimationFrame(reqIdRef.current);
+  }, [isRunning, callback]);
 };

@@ -1,41 +1,48 @@
-// PC-98 Inspired Palette
+// VOID WEAVER PALETTE
 export const PALETTE = {
-  BG_DARK: '#110022', // Deep purple/black
-  BG_GRID: '#2a1a4a',
-  PLAYER_MAIN: '#ff0044', // Neon Red
-  PLAYER_CORE: '#ffffff',
-  BULLET_ENEMY: '#aa00ff', // Bright Purple
-  BULLET_ENEMY_CORE: '#ddaaff',
-  BULLET_PLAYER: '#ff3333',
-  BOSS: '#4400cc',
-  ITEM_POWER: '#ff0000', // Red
-  ITEM_POINT: '#00ccff', // Blue
-  TEXT: '#00ffcc', // Cyber green
-  UI_BG: '#1a1a2e',
+  BG_VOID: '#000000',
+  BG_GRID: '#1a0b2e', // Deep Violet Black
+  
+  PLAYER_CORE: '#FFFFFF',
+  PLAYER_AURA: '#E056FD', // Neon Violet
+  PLAYER_HITBOX: '#FF003C', // Cyber Red
+  
+  BULLET_PLAYER: '#E056FD',
+  BULLET_ENEMY: '#FF003C', 
+  BULLET_GRAZE: '#FFFFFF',
+
+  ITEM_POWER: '#FF003C', // Red Box
+  ITEM_POINT: '#00F3FF', // Cyan Box
+  
+  BOSS: '#4B0082', // Indigo
+  BOSS_AURA: '#FF003C',
+  
+  TEXT_PRIMARY: '#E056FD',
+  TEXT_ALERT: '#FF003C',
+  UI_BORDER: '#333333'
 };
 
-// Dimensions
-export const GAME_WIDTH = 480; // Vertical play area
-export const GAME_HEIGHT = 640;
-export const CANVAS_WIDTH = 640; // Total canvas width (Play area + UI rendered on canvas for perf, or split)
+// DIMENSIONS (PC-98 Ratio)
 export const SCREEN_WIDTH = 640;
-export const SCREEN_HEIGHT = 400;
+export const SCREEN_HEIGHT = 480;
 
-export const PLAY_AREA_WIDTH = 300;
-export const PLAY_AREA_HEIGHT = 380;
-export const PLAY_AREA_X = (SCREEN_WIDTH - PLAY_AREA_WIDTH) / 2; // Center it
+export const PLAY_AREA_WIDTH = 384; // The vertical shmup strip
+export const PLAY_AREA_HEIGHT = 460;
+export const PLAY_AREA_X = 32;
 export const PLAY_AREA_Y = 10;
 
-// Logic
-export const MAX_BULLETS = 2000;
-export const MAX_ITEMS = 200;
-export const PLAYER_SPEED = 5;
-export const PLAYER_FOCUS_SPEED = 2;
-export const PLAYER_HITBOX_RADIUS = 3;
-export const PLAYER_GRAZE_RADIUS = 13; // Hitbox (3) + 10 pixels
-export const PLAYER_ITEM_COLLECT_RADIUS = 30;
+// GAMEPLAY BALANCING
+export const MAX_BULLETS = 2500;
+export const MAX_PARTICLES = 500;
+export const MAX_ITEMS = 100;
 
-// Boss
-export const BOSS_PHASE_HEALTH = 5000;
+export const PLAYER_SPEED = 5.5;
+export const PLAYER_FOCUS_SPEED = 2.5;
+
+export const PLAYER_HITBOX_RADIUS = 3;
+export const PLAYER_GRAZE_RADIUS = 18;
+export const PLAYER_COLLECT_RADIUS = 32;
+
+export const BOSS_PHASE_HEALTH = 4000;
 export const BOSS_TOTAL_PHASES = 3;
 export const BOSS_MAX_HEALTH = BOSS_PHASE_HEALTH * BOSS_TOTAL_PHASES;
