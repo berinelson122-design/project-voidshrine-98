@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GameCanvas } from './components/GameCanvas';
+import { DialogueOverlay } from './components/DialogueOverlay'; // NEW IMPORT
 import { GameStats } from './types';
-import { Play, Pause, Upload, Volume2 } from 'lucide-react';
+import { Upload, Volume2 } from 'lucide-react';
 import { PALETTE, BOSS_MAX_HEALTH } from './constants';
 
 const App: React.FC = () => {
   const [stats, setStats] = useState<GameStats>({ score: 0, lives: 3, bombs: 3, power: 0, graze: 0, bossHealth: BOSS_MAX_HEALTH, bossPhase: 0 });
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  const [showStory, setShowStory] = useState(false); // NEW STATE
   const [customAudio, setCustomAudio] = useState<string | null>(null);
+  const [volume, setVolume] = useState(0.5);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -19,82 +21,69 @@ const App: React.FC = () => {
   useEffect(() => {
       if (customAudio && isPlaying) {
           if (!audioRef.current) audioRef.current = new Audio(customAudio);
+          audioRef.current.src = customAudio;
           audioRef.current.loop = true;
-          isPaused ? audioRef.current.pause() : audioRef.current.play();
+          audioRef.current.volume = volume;
+          audioRef.current.play();
       }
       return () => { audioRef.current?.pause(); };
-  }, [customAudio, isPlaying, isPaused]);
+  }, [customAudio, isPlaying, volume]);
+
+  // NEW HANDLERS
+  const startSequence = () => setShowStory(true);
+  const concludeStory = () => {
+      setShowStory(false);
+      setIsPlaying(true);
+  };
 
   return (
-    <div className="h-screen bg-black flex items-center justify-center overflow-hidden touch-none font-mono text-[#E056FD]">
+    <div className="fixed inset-0 bg-black flex items-center justify-center overflow-hidden touch-none font-mono selection:bg-[#E056FD]">
       
-      {/* GAME CONTAINER */}
-      <div className="relative w-full max-w-[100vh] aspect-[4/3] bg-[#050505] border-2 border-[#333] shadow-[0_0_50px_rgba(224,86,253,0.1)]">
+      {/* UNIVERSAL WIDESCREEN CONTAINER */}
+      <div className="relative w-full h-full max-w-[1600px] flex items-center justify-center bg-[#000]">
         
+        {/* STORY OVERLAY */}
+        {showStory && <DialogueOverlay onComplete={concludeStory} />}
+
         {isPlaying ? (
             <GameCanvas 
                 customAudioSrc={customAudio} 
                 setStats={setStats} 
                 onGameOver={() => setIsPlaying(false)} 
-                isPaused={isPaused}
+                isPaused={false}
             />
         ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-50">
-                <h1 className="text-6xl font-bold tracking-tighter mb-8 text-[#FF003C] animate-pulse">SHRINE-98</h1>
-                <button 
-                    onClick={() => setIsPlaying(true)}
-                    className="px-8 py-3 bg-[#E056FD] text-black font-bold text-xl hover:scale-105 transition-transform"
-                >
-                    INITIATE PROTOCOL
-                </button>
-                <div className="mt-8 flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer border border-[#333] px-4 py-2 hover:border-[#E056FD]">
-                        <Upload size={16}/> Load MP3
-                        <input type="file" accept="audio/*" onChange={handleFile} className="hidden"/>
-                    </label>
+            <div className="relative z-50 p-1 bg-black border-2 border-[#E056FD] shadow-[0_0_30px_#E056FD66] transition-opacity duration-500">
+                <div className="bg-black border border-[#E056FD] p-10 flex flex-col items-center">
+                    <h1 className="text-5xl font-bold tracking-tighter mb-2 text-white">SHRINE-98</h1>
+                    <p className="text-[10px] text-[#E056FD] mb-8 tracking-[0.4em] uppercase">Vertical Danmaku Engine</p>
+                    
+                    <button 
+                        onClick={startSequence} // UPDATED
+                        className="w-full py-4 bg-[#E056FD] text-black font-black text-xl hover:bg-white transition-colors uppercase mb-6"
+                    >
+                        Initialize
+                    </button>
+
+                    <div className="w-full space-y-4 border-t border-[#333] pt-6">
+                        <label className="flex items-center justify-center gap-3 cursor-pointer text-xs text-[#E056FD] hover:text-white transition-all">
+                            <Upload size={14}/> [ LOAD ARK MP3 ]
+                            <input type="file" accept="audio/*" onChange={handleFile} className="hidden"/>
+                        </label>
+                        <div className="flex items-center gap-4">
+                            <Volume2 size={14} className="text-[#E056FD]"/>
+                            <input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e)=>setVolume(parseFloat(e.target.value))} className="flex-1 accent-[#E056FD] h-1 bg-[#222] rounded-full"/>
+                        </div>
+                    </div>
                 </div>
             </div>
         )}
 
-        {/* SIDEBAR UI (DESKTOP) */}
-        <div className="absolute top-0 right-[-200px] w-[180px] h-full hidden md:flex flex-col gap-4 text-xs">
-            <div className="bg-[#111] border border-[#333] p-4">
-                <div className="text-[#FF003C] font-bold text-xl mb-2">{stats.score.toString().padStart(9, '0')}</div>
-                <div className="mb-1">LIVES: {"♥".repeat(Math.max(0, stats.lives))}</div>
-                <div className="mb-1">BOMBS: {"★".repeat(Math.max(0, stats.bombs))}</div>
-                <div className="mb-1">POWER: {stats.power}/128</div>
-                <div className="mb-1">GRAZE: {stats.graze}</div>
-            </div>
-            
-            {/* BOSS BAR */}
-            <div className="bg-[#111] border border-[#333] p-4">
-                <div className="mb-1 text-[#FF003C]">BOSS PHASE {stats.bossPhase + 1}</div>
-                <div className="w-full h-2 bg-[#333]">
-                    <div className="h-full bg-[#FF003C]" style={{width: `${Math.max(0, (stats.bossHealth % 4000) / 4000 * 100)}%`}}></div>
-                </div>
-            </div>
-
-            <button onClick={() => setIsPaused(!isPaused)} className="mt-auto border border-[#333] p-2 hover:bg-[#222]">
-                {isPaused ? "RESUME" : "PAUSE"}
-            </button>
+        {/* PERSISTENT WATERMARK */}
+        <div className="fixed bottom-4 right-4 flex flex-col items-end opacity-60 pointer-events-none z-[110]">
+            <span className="text-[10px] text-[#E056FD] font-bold tracking-tighter">ARCHITECT // VOID_WEAVER</span>
+            <span className="text-[8px] text-[#E056FD] opacity-50">SYS // SHRINE_98_REDUX</span>
         </div>
-
-        {/* MOBILE CONTROLS OVERLAY */}
-        <div className="absolute inset-0 md:hidden pointer-events-none z-40 flex flex-col justify-end p-4">
-            <div className="flex justify-between items-end w-full pointer-events-auto">
-                <div className="w-32 h-32 bg-white/5 border border-white/20 rounded-full flex items-center justify-center">MOVE</div>
-                <div className="flex gap-4">
-                    <div className="w-16 h-16 bg-red-900/50 rounded-full border border-red-500 flex items-center justify-center text-xs">BOMB</div>
-                    <div className="w-20 h-20 bg-purple-900/50 rounded-full border border-purple-500 flex items-center justify-center text-xs">FIRE</div>
-                </div>
-            </div>
-        </div>
-
-        {/* WATERMARK */}
-        <div className="absolute bottom-2 right-2 text-[10px] text-[#E056FD] opacity-50 pointer-events-none">
-            ARCHITECT // VOID_WEAVER
-        </div>
-
       </div>
     </div>
   );
