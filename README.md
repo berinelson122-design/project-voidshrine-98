@@ -3,7 +3,7 @@
 Since this isn't a Unity game and was made with React + Vite, you need Node.js to run the dev environment.
 
 1. **Clone it:**
-   `git clone https://github.com/berinelson122-design/project-shrine-98.git`
+   `git clone https://github.com/berinelson122-design/project-voidshrine-98.git`
 
 2. **Install the dependencies:**
    `cd project-shrine-98`
