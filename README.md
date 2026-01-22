@@ -1,18 +1,41 @@
-## How to actually run this masterpiece:
+# VOIDMAIDEN // SHRINE_PROTOCOL_98
+**Version:** 3.2.0 (STABLE)
+**Architect:** Nelson Beri (Void Weaver)
+**Logic:** React 18 + TypeScript (Strict Mode) + HTML5 Canvas
 
-Since this isn't a Unity game and was made with React + Vite, you need Node.js to run the dev environment.
+---
 
-1. **Clone it:**
-   `git clone https://github.com/berinelson122-design/project-voidshrine-98.git`
+## ⚡ SYSTEM MANIFESTO
+"What doesn't kill you gives you Data."
 
-2. **Install the dependencies:**
-   `cd project-voidshrine-98`
-   `npm install`
+VoidMaiden is a high-performance, browser-based Danmaku (Bullet Hell) engine engineered to test the limits of procedural generation, reflex latency, and local data sovereignty. Inspired by the PC-98 era of Japanese computing, this artifact rejects modern "Live-Service Slop" in favor of an air-gapped, high-fidelity experience.
 
-3. **Start the engine:**
-   `npm run dev`
+## 🛠️ THE SOVEREIGN STACK
+*   **Core:** React 18 / Vite 5 (Zero-latency UI state management)
+*   **Rendering:** HTML5 Canvas API (Custom 60FPS tick-decoupled loop)
+*   **Memory Architecture:** Manual Object Pooling for 3,000+ active entities
+*   **Networking:** PeerJS (P2P WebRTC) for decentralized combat
+*   **Persistence:** Supabase (Leaderboard Uplink) + LocalStorage (Offline Buffer)
+*   **Audio Synthesis:** Web Audio API (FM-Synth SFX generation)
 
-4. **Open it:**
-   It usually runs on a local server like `http://localhost:5173`.
+## 🚀 OPERATIONAL FEATURES
+*   **Ark Radio Interface:** Native file-linkage allowing users to inject local .MP3 files directly into the simulation's audio buffer.
+*   **The 5-Phase Archon:** A procedurally scaling AI Boss with mathematical bullet patterns (Radial, Spiral, and Deterministic Chaos).
+*   **Sovereignty Protocol:** Full PWA integration. Once loaded, the engine operates 100% offline. 
+*   **Frame-Perfect Mechanics:** Functional Graze detection, Spell Card (Bomb) system, and a calibrated 12-frame deathbomb window.
 
-**Note:** If you want to use the build version (the one on Itch.io), just run `npm run build` and serve the `dist` folder.
+---
+
+## 💻 INITIALIZING THE NODE
+
+Ensure your hardware (M2 Silicon or equivalent) has Node.js installed.
+
+```bash
+# 1. Clone the archive
+git clone https://github.com/berinelson122-design/VoidMaiden.git
+
+# 2. Re-initialize the environment
+npm install
+
+# 3. Establish local server
+npm run dev
