@@ -4,7 +4,8 @@ export enum EntityType {
   BULLET_PLAYER,
   BULLET_ENEMY,
   ITEM_POWER,
-  ITEM_POINT
+  ITEM_POINT,
+  ITEM_LIFE // Added
 }
 
 export interface Entity {
@@ -21,6 +22,7 @@ export interface Entity {
   rotation?: number;
   grazed?: boolean;
   scale?: number;
+  homing?: boolean; // Added
 }
 
 export interface InputState {
@@ -28,17 +30,19 @@ export interface InputState {
   down: boolean;
   left: boolean;
   right: boolean;
-  focus: boolean; // Shift
-  shoot: boolean; // Z
-  bomb: boolean;  // X
+  focus: boolean;
+  shoot: boolean;
+  bomb: boolean;
 }
 
 export interface GameStats {
   score: number;
   lives: number;
   bombs: number;
-  power: number; // 0 to 128 (Max Power)
+  power: number;
   graze: number;
   bossHealth: number;
   bossPhase: number;
+  fps: number; // Added
+  hiscore: number; // Added
 }

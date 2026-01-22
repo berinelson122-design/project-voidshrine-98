@@ -1,6 +1,10 @@
 export class AudioSynth {
   private ctx: AudioContext | null = null;
   private gainNode: GainNode | null = null;
+  
+  playExtend() { 
+      this.playTone(1000, 'triangle', 0.5, 2000); // 1UP Sound
+  }
 
   init() {
     if (this.ctx) return;
