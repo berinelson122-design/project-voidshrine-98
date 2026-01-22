@@ -1,42 +1,20 @@
-# VOIDMAIDEN // SHRINE_PROTOCOL_98
-**Version:** 3.2.0 (STABLE)
-**Architect:** Nelson Beri (Void Weaver)
-**Logic:** React 18 + TypeScript (Strict Mode) + HTML5 Canvas
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
 
----
+# Run and deploy your AI Studio app
 
-## SYSTEM MANIFESTO
-"What doesn't kill you gives you Data."
+This contains everything you need to run your app locally.
 
-VoidMaiden is a high-performance, browser-based Danmaku (Bullet Hell) engine engineered to test the limits of procedural generation, reflex latency, and local data sovereignty. Inspired by the PC-98 era of Japanese computing, this artifact rejects modern "Live-Service Slop" in favor of an air-gapped, high-fidelity experience.
+View your app in AI Studio: https://ai.studio/apps/drive/1SwjkKJ6hk7iOFVKMOUtZoEa0pH68Pz9o
 
-## THE SOVEREIGN STACK
-*   **Core:** React 18 / Vite 5 (Zero-latency UI state management)
-*   **Rendering:** HTML5 Canvas API (Custom 60FPS tick-decoupled loop)
-*   **Memory Architecture:** Manual Object Pooling for 3,000+ active entities
-*   **Networking:** PeerJS (P2P WebRTC) for decentralized combat
-*   **Persistence:** Supabase (Leaderboard Uplink) + LocalStorage (Offline Buffer)
-*   **Audio Synthesis:** Web Audio API (FM-Synth SFX generation)
+## Run Locally
 
-## OPERATIONAL FEATURES
-*   **Ark Radio Interface:** Native file-linkage allowing users to inject local .MP3 files directly into the simulation's audio buffer.
-*   **The 5-Phase Archon:** A procedurally scaling AI Boss with mathematical bullet patterns (Radial, Spiral, and Deterministic Chaos).
-*   **Sovereignty Protocol:** Full PWA integration. Once loaded, the engine operates 100% offline. 
-*   **Frame-Perfect Mechanics:** Functional Graze detection, Spell Card (Bomb) system, and a calibrated 12-frame deathbomb window.
+**Prerequisites:**  Node.js
 
----
 
-## INITIALIZING THE NODE
-
-Ensure your hardware (M2 Silicon or equivalent) has Node.js installed.
-
-```bash
-# 1. CLONE THE REPO
-git clone https://github.com/berinelson122-design/project-voidshrine-98.git
-
-# 2. INSTALL THE ARCHITECTURE
-cd project-voidshrine-98
-npm install
-
-# 3. INITIALIZE THE CORE
-npm run dev
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
