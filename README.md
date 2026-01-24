@@ -55,7 +55,7 @@ VITE_GRID_ACCESS_TOKEN=your_anon_key
 
 ---
 
-## 🛡️ THE VOID WEAVER LICENSE
+## THE VOID WEAVER LICENSE
 **Proprietary / Educational Use.**  
 All rights reserved by Nelson Beri. Use the code to learn, build, and reclaim your sovereignty. Do not sell the engine as your own slop.
 
