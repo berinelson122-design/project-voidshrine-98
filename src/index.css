@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/**
+ * VOID_WEAVER // STYLE_MANIFEST_v2
+ * ARCHITECT: NELSON BERI
+ * HARDWARE: APPLE_M2_SILICON_OPTIMIZED
+ */
+
+@theme {
+  --color-cyber-red: #FF003C;
+  --color-neon-violet: #E056FD;
+  --font-mono: "JetBrains Mono", "VT323", monospace;
+}
+
+:root {
+  background-color: #000000;
+  color: #E5E5E5;
+  cursor: crosshair;
+}
+
+@layer base {
+  body {
+    @apply m-0 overflow-hidden bg-black font-mono;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* BRUTALIST SCANLINES PROTOCOL */
+.scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1000;
+  background: linear-gradient(
+    rgba(18, 18, 18, 0) 50%,
+    rgba(0, 0, 0, 0.25) 50%
+  );
+  background-size: 100% 4px;
+}
+
+/* CRT FLICKER SIMULATION */
+@keyframes flicker {
+  0% { opacity: 0.98; }
+  5% { opacity: 0.95; }
+  10% { opacity: 0.9; }
+  15% { opacity: 0.97; }
+  25% { opacity: 0.94; }
+  30% { opacity: 0.98; }
+  100% { opacity: 1; }
+}
+
+.crt-flicker {
+  animation: flicker 0.15s infinite;
+}
+
+/* NEON GLOW ENGINE */
+.neon-glow-violet {
+  text-shadow: 0 0 10px #E056FD, 0 0 20px #E056FD;
+}
+
+.neon-glow-red {
+  text-shadow: 0 0 10px #FF003C, 0 0 20px #FF003C;
+}
+
+.neon-border-violet {
+  box-shadow: 0 0 15px rgba(224, 86, 253, 0.4), inset 0 0 10px rgba(224, 86, 253, 0.2);
+}
+
+/* SELECTION OVERRIDE */
+::selection {
+  background: #FF003C;
+  color: #FFFFFF;
+}
+
+/* CUSTOM SCROLLBAR FOR DATA WAREHOUSING */
+::-webkit-scrollbar {
+  width: 0px;
+}

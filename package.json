@@ -1,0 +1,41 @@
+{
+  "name": "project-shrine-98",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "ship:vercel": "vercel --prod",
+    "ship:cloudflare": "npm run build && npx wrangler pages deploy dist",
+    "ship:all": "npm run ship:vercel && npm run ship:cloudflare"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.91.0",
+    "@vitejs/plugin-react": "^5.1.2",
+    "clsx": "^2.1.1",
+    "dotenv": "^17.2.3",
+    "framer-motion": "^12.26.2",
+    "lucide-react": "^0.562.0",
+    "peerjs": "^1.5.5",
+    "phaser": "^3.90.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-router-dom": "^7.12.0",
+    "recharts": "^3.6.0",
+    "tailwind-merge": "^3.4.0",
+    "vite": "^7.3.1",
+    "vite-plugin-pwa": "^1.2.0",
+    "zustand": "^5.0.10"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/node": "^22.19.5",
+    "@vitejs/plugin-react": "^5.0.0",
+    "tailwindcss": "^4.1.18",
+    "terser": "^5.46.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}
