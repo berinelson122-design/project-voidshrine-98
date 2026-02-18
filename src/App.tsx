@@ -6,7 +6,7 @@ import { DialogueOverlay } from './components/DialogueOverlay';
 import { VictoryScreen } from './components/VictoryScreen';
 import { DuelLink } from './components/DuelLink';
 import { Upload, Volume2 } from 'lucide-react';
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 export const App: React.FC = () => {
   const [stats, setStats] = useState<GameStats>({ score: 0, lives: 3, bombs: 3, power: 0, graze: 0, bossHealth: BOSS_MAX_HEALTH, bossPhase: 0, fps: 60, hiscore: 0 });
