@@ -2,7 +2,7 @@
 
 **VERSION:** 3.2.0 // FINAL_STABLE  
 **ARCHITECT:** Nelson Beri (Void Weaver)  
-**UPLINK:** [voidmaiden.netlify.app](https://voidmaiden.netlify.app)
+**UPLINK:** [voidmaiden.netlify.app](https://voidmaiden.netlify.app) | [https://project-voidshrine-98.vercel.app/] | [voidmaiden.berinelson122.workers.dev]
 
 ---
 
