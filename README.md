@@ -66,6 +66,9 @@ If the game displays a black screen on launch:
 All rights reserved by Nelson Beri. Use the code to learn, build, and reclaim your sovereignty. Do not sell the engine as your own slop.
 
 *"What doesn't kill you gives you Data... and keeps you away from interdimensional gap witches, probably."*
+
+P.S: If you wish to download the full source code and modify the game to your own likeness, buy it here: https://berinelson.gumroad.com/l/kfwnem
+
 <span style="color: #E056FD; font-family: monospace; font-size: 10px;">ARCHITECT // VOID_WEAVER</span>
 </div>
 ```
