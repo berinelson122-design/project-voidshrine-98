@@ -2,11 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-/**
- * VOID_WEAVER // VITE_BUILD_MANIFEST
- * HARDWARE: APPLE_M2_SILICON_OPTIMIZED
- * VERSION: 3.2.1
- */
+
 export default defineConfig({
   plugins: [
     react(),

@@ -1,7 +1,4 @@
-/**
- * VOID_WEAVER // VICTORY_PROTOCOL
- * ARCHITECT: NELSON BERI
- */
+
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { supabase } from '../services/supabaseClient';

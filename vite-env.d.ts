@@ -1,7 +1,4 @@
-/**
- * VOID_WEAVER // CORE_VIRTUAL_ENV
- * SYSTEM: TYPE_DEFINITIONS
- */
+
 
 /// <reference types="vite/client" />
 

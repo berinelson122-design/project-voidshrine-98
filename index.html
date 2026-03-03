@@ -1,32 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <meta name="theme-color" content="#0d0d15" />
-    <meta name="description" content="A PC-98 inspired Vertical Danmaku (Bullet Hell) engine." />
-    <title>Project SHRINE-98</title>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
-      body {
-        background-color: #0d0d15;
-        color: #e2e8f0;
-        font-family: 'VT323', monospace;
-        overflow: hidden;
-        overscroll-behavior: none;
-      }
-      /* Custom scanline effect */
-      .scanlines {
-        background: linear-gradient(
-          to bottom,
-          rgba(255,255,255,0),
-          rgba(255,255,255,0) 50%,
-          rgba(0,0,0,0.2) 50%,
-          rgba(0,0,0,0.2)
-        );
-        background-size: 100% 4px;
-      }
-    </style>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#0d0d15" />
+  <meta name="description" content="A PC-98 inspired Vertical Danmaku (Bullet Hell) engine." />
+  <title>Project SHRINE-98</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+    body {
+      background-color: #0d0d15;
+      color: #e2e8f0;
+      font-family: 'VT323', monospace;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+
+    /* Custom scanline effect */
+    .scanlines {
+      background: linear-gradient(to bottom,
+          rgba(255, 255, 255, 0),
+          rgba(255, 255, 255, 0) 50%,
+          rgba(0, 0, 0, 0.2) 50%,
+          rgba(0, 0, 0, 0.2));
+      background-size: 100% 4px;
+    }
+  </style>
   <script type="importmap">
 {
   "imports": {
@@ -39,10 +40,12 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
+  <link rel="stylesheet" href="/src/index.css">
 </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>

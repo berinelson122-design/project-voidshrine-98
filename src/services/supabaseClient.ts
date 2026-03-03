@@ -1,8 +1,4 @@
-/**
- * VOID_WEAVER // GRID_UPLINK_SERVICE
- * PROTOCOL: SUPABASE_V1
- * REPAIR: NULL_UPLINK_BYPASS
- */
+
 import { createClient } from '@supabase/supabase-js';
 
 const uplinkUrl = import.meta.env.VITE_GRID_UPLINK_URL;

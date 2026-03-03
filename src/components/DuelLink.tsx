@@ -1,7 +1,4 @@
-/**
-* VOID_WEAVER // DUEL_LINK_INTERFACE
-* ARCHITECT: NELSON BERI
-*/
+
 import React, { useState, useEffect, useRef } from 'react';
 import Peer, { DataConnection } from 'peerjs';
 import { Share2, Zap, ShieldAlert, Terminal } from 'lucide-react';

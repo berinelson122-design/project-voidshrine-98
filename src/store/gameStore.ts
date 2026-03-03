@@ -1,7 +1,4 @@
-/**
- * VOID_WEAVER // CENTRAL_COMMAND
- * STATE_MANAGER: ZUSTAND_v4
- */
+
 import { supabase } from '../services/supabaseClient';
 import { create } from 'zustand';
 
