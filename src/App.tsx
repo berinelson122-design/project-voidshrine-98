@@ -79,6 +79,7 @@ export const App: React.FC = () => {
             <span className="text-[8px] text-[#E056FD] opacity-50">SYS // SHRINE_98_REDUX</span>
         </div>
       </div>
+      <SpeedInsights />
     </div>
   );
 };
