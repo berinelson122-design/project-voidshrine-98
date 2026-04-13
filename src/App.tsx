@@ -6,8 +6,13 @@ import { DialogueOverlay } from './components/DialogueOverlay';
 import { VictoryScreen } from './components/VictoryScreen';
 import { DuelLink } from './components/DuelLink';
 import { Upload, Volume2 } from 'lucide-react';
+import { ControlSettings } from './components/ui/ControlSettings';
+import { useUniversalInput } from './hooks/useUniversalInput';
+import { ViewportShield } from './components/layout/ViewportShield';
+import { Terminal, Shield, Zap } from 'lucide-react';
 
 export const App: React.FC = () => {
+    useUniversalInput(); // Initialize global input listeners
     const [stats, setStats] = useState<GameStats>({ score: 0, lives: 3, bombs: 3, power: 0, graze: 0, bossHealth: BOSS_MAX_HEALTH, bossPhase: 0, fps: 60, hiscore: 0 });
     const [isPlaying, setIsPlaying] = useState(false);
     const [showStory, setShowStory] = useState(false);

@@ -5,9 +5,11 @@ import {
     MAX_BULLETS, MAX_ITEMS, MAX_PARTICLES, PLAYER_SPEED, PLAYER_FOCUS_SPEED,
     PLAYER_HITBOX_RADIUS, PLAYER_GRAZE_RADIUS, PLAYER_COLLECT_RADIUS, BOSS_MAX_HEALTH, BOSS_TOTAL_PHASES, POC_THRESHOLD_Y, DEATHBOMB_WINDOW, SCORE_EXTEND_1
 } from '../constants';
-import { Entity, EntityType, InputState, GameStats } from '../types';
+import { Entity, EntityType, GameStats } from '../types';
 import { audioSynth } from '../services/AudioSynth';
-import { Zap, Target } from 'lucide-react';
+import { Zap, Target, Crosshair } from 'lucide-react';
+import { useInputStore } from '../store/useInputStore';
+import { VirtualJoystick } from './ui/VirtualJoystick';
 
 // --- ENTITY POOL ARCHITECTURE ---
 class EntityPool {
@@ -86,41 +88,21 @@ export const GameCanvas: React.FC<{
     const bgScroll = useRef(0);
     const scoreExtends = useRef([false, false]);
     const stats = useRef<GameStats>({ score: 0, lives: 3, bombs: 3, power: 0, graze: 0, bossHealth: BOSS_MAX_HEALTH, bossPhase: 0, fps: 60, hiscore: 0 });
-    const input = useRef<InputState>({ up: false, down: false, left: false, right: false, focus: false, shoot: false, bomb: false });
-    const touchState = useRef({ up: false, down: false, left: false, right: false, shoot: false, bomb: false, focus: false });
     const frames = useRef(0);
-    const lastTouch = useRef<{ x: number, y: number } | null>(null);
 
-    // --- AUDIO & INPUT UPLINK ---
+    // --- INITIALIZATION ---
     useEffect(() => {
-        // Detect Mobile (Simple Heuristic)
         setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0);
-
         const initAudio = () => audioSynth.init();
         window.addEventListener('click', initAudio);
         window.addEventListener('touchstart', initAudio);
 
-        // Load Hiscore
         const saved = localStorage.getItem('SHRINE98_HISCORE');
         if (saved) stats.current.hiscore = parseInt(saved);
 
-        const handleKey = (e: KeyboardEvent, isDown: boolean) => {
-            switch (e.code) {
-                case 'ArrowUp': input.current.up = isDown; break;
-                case 'ArrowDown': input.current.down = isDown; break;
-                case 'ArrowLeft': input.current.left = isDown; break;
-                case 'ArrowRight': input.current.right = isDown; break;
-                case 'ShiftLeft': input.current.focus = isDown; break;
-                case 'KeyZ': input.current.shoot = isDown; break;
-                case 'KeyX': input.current.bomb = isDown; break;
-            }
-        };
-        window.addEventListener('keydown', e => handleKey(e, true));
-        window.addEventListener('keyup', e => handleKey(e, false));
         return () => {
             window.removeEventListener('click', initAudio);
-            window.removeEventListener('keydown', e => handleKey(e, true));
-            window.removeEventListener('keyup', e => handleKey(e, false));
+            window.removeEventListener('touchstart', initAudio);
         };
     }, []);
 
@@ -166,21 +148,20 @@ export const GameCanvas: React.FC<{
         }
     };
 
-    const firePlayer = () => {
+    const firePlayer = (isFocused: boolean) => {
         audioSynth.playShoot();
         const pwr = stats.current.power;
         const level = Math.floor(pwr / 32) + 1;
-        const focus = input.current.focus || touchState.current.focus;
 
         bulletPool.spawn(player.current.x, player.current.y - 10, 0, -20, PALETTE.BULLET_PLAYER, 6, 16, EntityType.BULLET_PLAYER);
 
         if (level >= 2) {
-            const spread = focus ? 2 : 5;
+            const spread = isFocused ? 2 : 5;
             bulletPool.spawn(player.current.x - 8, player.current.y, -spread * 0.5, -18, PALETTE.BULLET_PLAYER, 4, 12, EntityType.BULLET_PLAYER);
             bulletPool.spawn(player.current.x + 8, player.current.y, spread * 0.5, -18, PALETTE.BULLET_PLAYER, 4, 12, EntityType.BULLET_PLAYER);
         }
         if (level >= 3) {
-            const spread = focus ? 4 : 10;
+            const spread = isFocused ? 4 : 10;
             bulletPool.spawn(player.current.x - 16, player.current.y + 5, -spread, -16, PALETTE.BULLET_PLAYER, 4, 12, EntityType.BULLET_PLAYER);
             bulletPool.spawn(player.current.x + 16, player.current.y + 5, spread, -16, PALETTE.BULLET_PLAYER, 4, 12, EntityType.BULLET_PLAYER);
         }
@@ -190,9 +171,12 @@ export const GameCanvas: React.FC<{
         if (isPaused || !player.current.active) return;
         frames.current++;
 
+        // 1. UPLINK TO GLOBAL INPUT STATE
+        const cmds = useInputStore.getState().commands;
+
         if (deathBombTimer.current > 0) {
             deathBombTimer.current--;
-            if ((input.current.bomb || touchState.current.bomb) && stats.current.bombs > 0) {
+            if (cmds.BOMB && stats.current.bombs > 0) {
                 triggerBomb();
             } else if (deathBombTimer.current <= 0) {
                 finalizeDeath();
@@ -200,31 +184,22 @@ export const GameCanvas: React.FC<{
             return;
         }
 
-        const inputs = {
-            u: input.current.up || touchState.current.up,
-            d: input.current.down || touchState.current.down,
-            l: input.current.left || touchState.current.left,
-            r: input.current.right || touchState.current.right,
-            s: input.current.shoot || touchState.current.shoot,
-            b: input.current.bomb || touchState.current.bomb,
-            f: input.current.focus || touchState.current.focus
-        };
+        if (cmds.BOMB) triggerBomb();
 
-        if (inputs.b) triggerBomb();
-
-        const spd = inputs.f ? PLAYER_FOCUS_SPEED : PLAYER_SPEED;
-        if (inputs.u) player.current.y -= spd;
-        if (inputs.d) player.current.y += spd;
-        if (inputs.l) player.current.x -= spd;
-        if (inputs.r) player.current.x += spd;
+        const spd = cmds.FOCUS ? PLAYER_FOCUS_SPEED : PLAYER_SPEED;
+        if (cmds.UP) player.current.y -= spd;
+        if (cmds.DOWN) player.current.y += spd;
+        if (cmds.LEFT) player.current.x -= spd;
+        if (cmds.RIGHT) player.current.x += spd;
 
         player.current.x = Math.max(PLAY_AREA_X + 5, Math.min(PLAY_AREA_X + PLAY_AREA_WIDTH - 5, player.current.x));
         player.current.y = Math.max(PLAY_AREA_Y + 5, Math.min(PLAY_AREA_Y + PLAY_AREA_HEIGHT - 5, player.current.y));
 
         const pocActive = player.current.y < POC_THRESHOLD_Y;
 
-        if (inputs.s && frames.current % 4 === 0) firePlayer();
+        if (cmds.ACTION && frames.current % 4 === 0) firePlayer(cmds.FOCUS);
 
+        // --- ENEMY/BULLET LOGIC (UNCHANGED) ---
         boss.current.timer++;
         boss.current.rotation += 0.02;
         boss.current.x = (PLAY_AREA_X + PLAY_AREA_WIDTH / 2) + Math.sin(boss.current.timer * 0.015) * 60;
@@ -361,6 +336,8 @@ export const GameCanvas: React.FC<{
         const ctx = canvasRef.current?.getContext('2d');
         if (!ctx) return;
 
+        const cmds = useInputStore.getState().commands; // Read state for visual feedback
+
         const sx = (Math.random() - 0.5) * shake.current;
         const sy = (Math.random() - 0.5) * shake.current;
         ctx.save();
@@ -380,13 +357,13 @@ export const GameCanvas: React.FC<{
         ctx.beginPath(); ctx.moveTo(PLAY_AREA_X, POC_THRESHOLD_Y); ctx.lineTo(PLAY_AREA_X + PLAY_AREA_WIDTH, POC_THRESHOLD_Y); ctx.stroke();
         ctx.setLineDash([]);
 
-        if (input.current.focus || touchState.current.focus) {
+        if (cmds.FOCUS) {
             ctx.fillStyle = '#FFFFFF';
             ctx.beginPath();
             ctx.arc(player.current.x, player.current.y, PLAYER_HITBOX_RADIUS, 0, Math.PI * 2);
             ctx.fill();
 
-            ctx.strokeStyle = '#FF003C'; // Cyber-Red Border
+            ctx.strokeStyle = '#FF003C';
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.arc(player.current.x, player.current.y, PLAYER_HITBOX_RADIUS + 1, 0, Math.PI * 2);
@@ -401,7 +378,6 @@ export const GameCanvas: React.FC<{
         }
 
         // BOSS
-
         if (boss.current.active) {
             ctx.save();
             ctx.translate(boss.current.x, boss.current.y);
@@ -435,7 +411,7 @@ export const GameCanvas: React.FC<{
             ctx.beginPath(); ctx.moveTo(player.current.x, player.current.y - 15); ctx.lineTo(player.current.x + 10, player.current.y + 10); ctx.lineTo(player.current.x - 10, player.current.y + 10); ctx.fill();
             ctx.fillStyle = PALETTE.PLAYER_CORE; ctx.fillRect(player.current.x - 3, player.current.y - 12, 6, 6);
 
-            if (input.current.focus || touchState.current.focus) {
+            if (cmds.FOCUS) {
                 const rot = frames.current * 0.1;
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
                 ctx.beginPath(); ctx.arc(player.current.x, player.current.y, PLAYER_HITBOX_RADIUS, 0, Math.PI * 2); ctx.stroke();
@@ -486,44 +462,50 @@ export const GameCanvas: React.FC<{
         }
     };
 
-    const handleTouchStart = (e: React.TouchEvent) => { lastTouch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; input.current.shoot = true; audioSynth.init(); };
-    const handleTouchMove = (e: React.TouchEvent) => {
-        if (!lastTouch.current) return;
-        const t = e.touches[0];
-        const dx = (t.clientX - lastTouch.current.x) * 1.5;
-        const dy = (t.clientY - lastTouch.current.y) * 1.5;
-        player.current.x += dx; player.current.y += dy;
-        lastTouch.current = { x: t.clientX, y: t.clientY };
-    };
-
     useGameLoop((dt) => { update(dt); draw(); }, !isPaused);
 
     return (
         <div className="relative w-full h-full flex justify-center items-center">
             <canvas ref={canvasRef} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={() => { lastTouch.current = null; input.current.shoot = false; }}
-                className="w-full h-full object-contain cursor-crosshair shadow-[0_0_30px_rgba(224,86,253,0.3)]"
+                className="w-full h-full object-contain shadow-[0_0_30px_rgba(224,86,253,0.3)]"
             />
 
-            {/* MOBILE CONTROLS OVERLAY - Only shows on Mobile Devices */}
+            {/* MOBILE HARDWARE OVERRIDE */}
             {isMobile && (
                 <>
-                    <div
-                        className="absolute bottom-6 left-6 w-24 h-24 bg-[#FF003C]/20 border-2 border-[#FF003C] rounded-full flex items-center justify-center active:bg-[#FF003C]/50 backdrop-blur-sm z-50 touch-none select-none"
-                        onTouchStart={(e) => { e.preventDefault(); touchState.current.bomb = true; }}
-                        onTouchEnd={(e) => { e.preventDefault(); touchState.current.bomb = false; }}
-                    >
-                        <Zap className="text-white w-8 h-8" />
+                    {/* Left Haptic Node */}
+                    <div className="absolute bottom-12 left-12 z-50">
+                        <VirtualJoystick size={150} stickSize={60} />
                     </div>
 
-                    <div
-                        className="absolute bottom-6 right-6 w-24 h-24 bg-[#E056FD]/20 border-2 border-[#E056FD] rounded-full flex items-center justify-center active:bg-[#E056FD]/50 backdrop-blur-sm z-50 touch-none select-none"
-                        onTouchStart={(e) => { e.preventDefault(); touchState.current.focus = true; }}
-                        onTouchEnd={(e) => { e.preventDefault(); touchState.current.focus = false; }}
-                    >
-                        <Target className="text-white w-8 h-8" />
+                    {/* Right Logic Nodes */}
+                    <div className="absolute bottom-16 right-16 flex flex-col gap-6 z-50">
+                        <div className="flex gap-4">
+                            <button
+                                className="w-16 h-16 rounded-full bg-[#E056FD]/30 border-2 border-[#E056FD] active:bg-[#E056FD] text-white font-bold flex flex-col items-center justify-center select-none touch-none"
+                                onTouchStart={(e) => { e.preventDefault(); useInputStore.getState().setCommand('FOCUS', true); }}
+                                onTouchEnd={(e) => { e.preventDefault(); useInputStore.getState().setCommand('FOCUS', false); }}
+                            >
+                                <Target size={20} />
+                                <span className="text-[8px]">FOCUS</span>
+                            </button>
+                            <button
+                                className="w-16 h-16 rounded-full bg-[#FF003C]/30 border-2 border-[#FF003C] active:bg-[#FF003C] text-white font-bold flex flex-col items-center justify-center select-none touch-none"
+                                onTouchStart={(e) => { e.preventDefault(); useInputStore.getState().setCommand('BOMB', true); }}
+                                onTouchEnd={(e) => { e.preventDefault(); useInputStore.getState().setCommand('BOMB', false); }}
+                            >
+                                <Zap size={20} />
+                                <span className="text-[8px]">BOMB</span>
+                            </button>
+                        </div>
+                        <button
+                            className="w-full h-20 rounded-full bg-white/10 border-2 border-white active:bg-white active:text-black text-white font-bold flex flex-col items-center justify-center select-none touch-none"
+                            onTouchStart={(e) => { e.preventDefault(); useInputStore.getState().setCommand('ACTION', true); }}
+                            onTouchEnd={(e) => { e.preventDefault(); useInputStore.getState().setCommand('ACTION', false); }}
+                        >
+                            <Crosshair size={24} className="mb-1" />
+                            <span className="text-[10px] tracking-widest">FIRE</span>
+                        </button>
                     </div>
                 </>
             )}
