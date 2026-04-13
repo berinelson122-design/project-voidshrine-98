@@ -61,7 +61,7 @@ export const App: React.FC = () => {
                     <div className="relative z-50 p-1 bg-black border-2 border-[#E056FD] shadow-[0_0_30px_#E056FD66] animate-in fade-in zoom-in">
                         <div className="bg-black border border-[#E056FD] p-10 flex flex-col items-center gap-6">
                             <h1 className="text-6xl font-bold tracking-tighter text-white drop-shadow-[0_0_10px_#E056FD]">SHRINE-98</h1>
-                            <p className="text-[10px] text-[#E056FD] tracking-[0.4em] uppercase">Vertical Danmaku Engine // v3.2</p>
+                            <p className="text-[10px] text-[#E056FD] tracking-[0.4em] uppercase">Vertical Danmaku Engine // v3.5</p>
                             <button onClick={startSequence} className="w-full py-4 bg-[#E056FD] text-black font-black text-xl hover:bg-white hover:scale-105 transition-all uppercase tracking-widest">Initialize</button>
                             <div className="w-full space-y-4 border-t border-[#333] pt-6">
                                 <label className="flex items-center justify-center gap-3 cursor-pointer text-xs text-[#E056FD] hover:text-white transition-all border border-[#333] py-2 hover:border-[#E056FD]">
