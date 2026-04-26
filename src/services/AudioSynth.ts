@@ -1,10 +1,12 @@
 export class AudioSynth {
   private ctx: AudioContext | null = null;
   private gainNode: GainNode | null = null;
-  
-  playExtend() { 
-      this.playTone(1000, 'triangle', 0.5, 2000); // 1UP Sound
+  private analyser: AnalyserNode | null = null;
+  private dataArray: Uint8Array<ArrayBuffer> | null = null;
+  playExtend() {
+    this.playTone(1000, 'triangle', 0.5, 2000); // 1UP Sound
   }
+
 
   init() {
     if (this.ctx) return;
@@ -13,7 +15,33 @@ export class AudioSynth {
     this.gainNode = this.ctx.createGain();
     this.gainNode.gain.value = 0.2;
     this.gainNode.connect(this.ctx.destination);
+
+
+    this.analyser = this.ctx.createAnalyser();
+    this.analyser.fftSize = 256;
+    this.dataArray = new Uint8Array(this.analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
+    this.gainNode.connect(this.analyser);
   }
+
+
+  getSpectrum(): Uint8Array<ArrayBuffer> | null {
+    if (!this.analyser || !this.dataArray) return null;
+    this.analyser.getByteFrequencyData(this.dataArray);
+    return this.dataArray;
+  }
+
+
+  connectExternalAudio(audioElement: HTMLMediaElement) {
+    if (!this.ctx || !this.gainNode) return;
+    try {
+      const track = this.ctx.createMediaElementSource(audioElement);
+      track.connect(this.gainNode);
+    } catch (e) {
+      // Ignore if already connected
+      console.warn("Audio node possibly already connected.", e);
+    }
+  }
+
 
   private playTone(freq: number, type: OscillatorType, duration: number, slide?: number) {
     if (!this.ctx || !this.gainNode) return;
@@ -31,10 +59,11 @@ export class AudioSynth {
     osc.stop(this.ctx.currentTime + duration);
   }
 
+
   playShoot() { this.playTone(880, 'square', 0.05, 440); }
   playGraze() { this.playTone(2000, 'sine', 0.03); }
   playHit() { this.playTone(150, 'sawtooth', 0.4, 10); }
   playItem() { this.playTone(1200, 'sine', 0.1, 2400); }
-  playBomb() { this.playTone(500, 'sine', 0.1, 800)}
+  playBomb() { this.playTone(500, 'sine', 0.1, 800) }
 }
 export const audioSynth = new AudioSynth();

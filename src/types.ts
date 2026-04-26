@@ -1,3 +1,12 @@
+export enum GameMode {
+  NORMAL,
+  TELLURIC_RESONANCE,
+  AETHER_OVERLOAD,
+  OBSIDIAN_SCRUBBER,
+  PHASE_SHIFT
+}
+
+
 export enum EntityType {
   PLAYER,
   BOSS,
@@ -5,8 +14,10 @@ export enum EntityType {
   BULLET_ENEMY,
   ITEM_POWER,
   ITEM_POINT,
-  ITEM_LIFE
+  ITEM_LIFE,
+  ITEM_BIOCHAR
 }
+
 
 export interface Entity {
   id: number;
@@ -25,6 +36,7 @@ export interface Entity {
   homing?: boolean;
 }
 
+
 export interface InputState {
   up: boolean;
   down: boolean;
@@ -34,6 +46,7 @@ export interface InputState {
   shoot: boolean;
   bomb: boolean;
 }
+
 
 export interface GameStats {
   score: number;
@@ -45,4 +58,6 @@ export interface GameStats {
   bossPhase: number;
   fps: number;
   hiscore: number;
+  pressure?: number;
+  topography?: number;
 }

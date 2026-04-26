@@ -5,11 +5,12 @@ import {
     MAX_BULLETS, MAX_ITEMS, MAX_PARTICLES, PLAYER_SPEED, PLAYER_FOCUS_SPEED,
     PLAYER_HITBOX_RADIUS, PLAYER_GRAZE_RADIUS, PLAYER_COLLECT_RADIUS, BOSS_MAX_HEALTH, BOSS_TOTAL_PHASES, POC_THRESHOLD_Y, DEATHBOMB_WINDOW, SCORE_EXTEND_1
 } from '../constants';
-import { Entity, EntityType, GameStats } from '../types';
+import { Entity, EntityType, GameStats, GameMode } from '../types';
 import { audioSynth } from '../services/AudioSynth';
 import { Zap, Target, Crosshair } from 'lucide-react';
 import { useInputStore } from '../store/useInputStore';
 import { VirtualJoystick } from './ui/VirtualJoystick';
+
 
 // --- ENTITY POOL ARCHITECTURE ---
 class EntityPool {
@@ -36,6 +37,7 @@ class EntityPool {
         });
     }
 }
+
 
 class ParticlePool {
     pool: any[];
@@ -64,19 +66,24 @@ class ParticlePool {
     }
 }
 
+
 const bulletPool = new EntityPool(MAX_BULLETS, EntityType.BULLET_ENEMY);
 const itemPool = new EntityPool(MAX_ITEMS, EntityType.ITEM_POWER);
 const particlePool = new ParticlePool();
+
 
 export const GameCanvas: React.FC<{
     customAudioSrc: string | null;
     setStats: (s: GameStats) => void;
     onGameOver: () => void;
     isPaused: boolean;
-}> = ({ customAudioSrc, setStats, onGameOver, isPaused }) => {
+    mode: GameMode;
+}> = ({ customAudioSrc, setStats, onGameOver, isPaused, mode }) => {
+
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isMobile, setIsMobile] = useState(false);
+
 
     // GAME STATE
     const player = useRef<Entity>({ id: -1, active: true, type: EntityType.PLAYER, x: 320, y: 400, dx: 0, dy: 0, width: 0, height: 0, color: PALETTE.PLAYER_CORE });
@@ -87,8 +94,9 @@ export const GameCanvas: React.FC<{
     const deathBombTimer = useRef(0);
     const bgScroll = useRef(0);
     const scoreExtends = useRef([false, false]);
-    const stats = useRef<GameStats>({ score: 0, lives: 3, bombs: 3, power: 0, graze: 0, bossHealth: BOSS_MAX_HEALTH, bossPhase: 0, fps: 60, hiscore: 0 });
+    const stats = useRef<GameStats>({ score: 0, lives: 3, bombs: 3, power: 0, graze: 0, bossHealth: BOSS_MAX_HEALTH, bossPhase: 0, fps: 60, hiscore: 0, pressure: 0, topography: 0 });
     const frames = useRef(0);
+
 
     // --- INITIALIZATION ---
     useEffect(() => {
@@ -97,14 +105,17 @@ export const GameCanvas: React.FC<{
         window.addEventListener('click', initAudio);
         window.addEventListener('touchstart', initAudio);
 
+
         const saved = localStorage.getItem('SHRINE98_HISCORE');
         if (saved) stats.current.hiscore = parseInt(saved);
+
 
         return () => {
             window.removeEventListener('click', initAudio);
             window.removeEventListener('touchstart', initAudio);
         };
     }, []);
+
 
     const triggerBomb = () => {
         if (stats.current.bombs > 0 && !bomb.current.active) {
@@ -120,12 +131,14 @@ export const GameCanvas: React.FC<{
         }
     };
 
+
     const handlePlayerDeath = () => {
         if (deathBombTimer.current > 0) return;
         deathBombTimer.current = DEATHBOMB_WINDOW;
         audioSynth.playHit();
         shake.current = 30;
     };
+
 
     const finalizeDeath = () => {
         stats.current.lives--;
@@ -135,10 +148,13 @@ export const GameCanvas: React.FC<{
         particlePool.spawn(player.current.x, player.current.y, PALETTE.PLAYER_AURA, 50, 6);
         bulletPool.clear(particlePool);
 
+
         for (let k = 0; k < 5; k++) itemPool.spawn(boss.current.x, boss.current.y, (Math.random() - 0.5) * 5, -5, PALETTE.ITEM_POWER, 8, 8, EntityType.ITEM_POWER);
+
 
         player.current.x = PLAY_AREA_X + PLAY_AREA_WIDTH / 2;
         player.current.y = PLAY_AREA_Y + PLAY_AREA_HEIGHT - 30;
+
 
         if (stats.current.lives < 0) {
             if (stats.current.score > stats.current.hiscore) {
@@ -148,12 +164,15 @@ export const GameCanvas: React.FC<{
         }
     };
 
+
     const firePlayer = (isFocused: boolean) => {
         audioSynth.playShoot();
         const pwr = stats.current.power;
         const level = Math.floor(pwr / 32) + 1;
 
+
         bulletPool.spawn(player.current.x, player.current.y - 10, 0, -20, PALETTE.BULLET_PLAYER, 6, 16, EntityType.BULLET_PLAYER);
+
 
         if (level >= 2) {
             const spread = isFocused ? 2 : 5;
@@ -167,12 +186,15 @@ export const GameCanvas: React.FC<{
         }
     };
 
+
     const update = (dt: number) => {
         if (isPaused || !player.current.active) return;
         frames.current++;
 
+
         // 1. UPLINK TO GLOBAL INPUT STATE
         const cmds = useInputStore.getState().commands;
+
 
         if (deathBombTimer.current > 0) {
             deathBombTimer.current--;
@@ -184,20 +206,47 @@ export const GameCanvas: React.FC<{
             return;
         }
 
+
+        // Aether Overload bomb mapping / Game Over
+        if (mode === GameMode.AETHER_OVERLOAD) {
+            if ((stats.current.pressure || 0) >= 100) {
+                stats.current.pressure = 0;
+                handlePlayerDeath(); // Overload
+            } else if (cmds.BOMB && (stats.current.pressure || 0) > 0) {
+                stats.current.pressure = 0; // release
+                triggerBomb();
+                cmds.BOMB = false;
+            }
+        }
+
+
         if (cmds.BOMB) triggerBomb();
 
-        const spd = cmds.FOCUS ? PLAYER_FOCUS_SPEED : PLAYER_SPEED;
+
+        let spd = cmds.FOCUS ? PLAYER_FOCUS_SPEED : PLAYER_SPEED;
+        if (mode === GameMode.AETHER_OVERLOAD) spd *= (1 + (stats.current.pressure || 0) / 100);
+
+
         if (cmds.UP) player.current.y -= spd;
         if (cmds.DOWN) player.current.y += spd;
         if (cmds.LEFT) player.current.x -= spd;
         if (cmds.RIGHT) player.current.x += spd;
 
+
         player.current.x = Math.max(PLAY_AREA_X + 5, Math.min(PLAY_AREA_X + PLAY_AREA_WIDTH - 5, player.current.x));
         player.current.y = Math.max(PLAY_AREA_Y + 5, Math.min(PLAY_AREA_Y + PLAY_AREA_HEIGHT - 5, player.current.y));
 
+
         const pocActive = player.current.y < POC_THRESHOLD_Y;
 
-        if (cmds.ACTION && frames.current % 4 === 0) firePlayer(cmds.FOCUS);
+
+        if (mode === GameMode.AETHER_OVERLOAD) {
+            const fireDelay = Math.max(1, Math.floor(4 - (stats.current.pressure || 0) / 25));
+            if (frames.current % fireDelay === 0) firePlayer(cmds.FOCUS);
+        } else {
+            if (cmds.ACTION && frames.current % 4 === 0) firePlayer(cmds.FOCUS);
+        }
+
 
         // --- ENEMY/BULLET LOGIC (UNCHANGED) ---
         boss.current.timer++;
@@ -205,11 +254,33 @@ export const GameCanvas: React.FC<{
         boss.current.x = (PLAY_AREA_X + PLAY_AREA_WIDTH / 2) + Math.sin(boss.current.timer * 0.015) * 60;
         boss.current.y = 100 + Math.cos(boss.current.timer * 0.02) * 20;
 
+
         if (boss.current.active) {
             const t = boss.current.timer;
             const phase = boss.current.phase;
 
-            if (phase === 0 && t % 20 === 0) {
+
+            if (mode === GameMode.TELLURIC_RESONANCE) {
+                const spec = audioSynth.getSpectrum();
+                if (spec) {
+                    let lowAvg = 0, highAvg = 0;
+                    for (let i = 0; i < 5; i++) lowAvg += spec[i];
+                    for (let i = 100; i < 110; i++) highAvg += spec[i];
+                    lowAvg /= 5; highAvg /= 10;
+
+                    if (highAvg > 160 && t % 3 === 0) {
+                        const a = t * 0.1;
+                        bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 6, Math.sin(a) * 6, '#FF003C', 4, 16);
+                        bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a + Math.PI) * 6, Math.sin(a + Math.PI) * 6, '#E056FD', 4, 16);
+                    }
+                    if (lowAvg > 220 && t % 40 === 0) {
+                        for (let i = 0; i < 8; i++) {
+                            const a = (Math.PI * 2 / 8) * i;
+                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 2.5, Math.sin(a) * 2.5, '#00FF00', 14, 14);
+                        }
+                    }
+                }
+            } else if (phase === 0 && t % 20 === 0) {
                 const count = 20;
                 for (let i = 0; i < count; i++) {
                     const a = (Math.PI * 2 / count) * i + t * 0.05;
@@ -229,10 +300,12 @@ export const GameCanvas: React.FC<{
             }
         }
 
+
         bulletPool.pool.forEach(b => {
             if (!b.active) return;
             b.x += b.dx; b.y += b.dy;
             if (b.x < PLAY_AREA_X - 20 || b.x > PLAY_AREA_X + PLAY_AREA_WIDTH + 20 || b.y < PLAY_AREA_Y - 20 || b.y > PLAY_AREA_Y + PLAY_AREA_HEIGHT + 20) b.active = false;
+
 
             if (bomb.current.active && b.type === EntityType.BULLET_ENEMY) {
                 const dx = b.x - player.current.x; const dy = b.y - player.current.y;
@@ -242,19 +315,33 @@ export const GameCanvas: React.FC<{
                 }
             }
 
+
             if (b.type === EntityType.BULLET_ENEMY && player.current.active && invuln.current <= 0 && deathBombTimer.current <= 0) {
                 const dx = b.x - player.current.x; const dy = b.y - player.current.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < PLAYER_HITBOX_RADIUS + 3) {
+
+                if (mode === GameMode.PHASE_SHIFT && cmds.FOCUS) {
+                    if (dist < 80) {
+                        b.x -= dx * 0.05;
+                        b.y -= dy * 0.05;
+                        if (dist < PLAYER_HITBOX_RADIUS + 10) {
+                            b.active = false;
+                            audioSynth.playGraze();
+                            stats.current.bombs = Math.min(stats.current.bombs + 0.05, 5); // Energy Scavenging
+                        }
+                    }
+                } else if (dist < PLAYER_HITBOX_RADIUS + 3) {
                     b.active = false;
                     handlePlayerDeath();
                 } else if (dist < PLAYER_GRAZE_RADIUS && !b.grazed) {
                     b.grazed = true; stats.current.graze++; stats.current.score += 500;
+                    if (mode === GameMode.AETHER_OVERLOAD) stats.current.pressure = Math.min(100, (stats.current.pressure || 0) + 5);
                     audioSynth.playGraze();
                     particlePool.spawn(b.x, b.y, '#fff', 1, 1);
                 }
             }
         });
+
 
         itemPool.pool.forEach(i => {
             if (!i.active) return;
@@ -269,6 +356,7 @@ export const GameCanvas: React.FC<{
                 i.y += 2.5;
             }
 
+
             const dx = i.x - player.current.x; const dy = i.y - player.current.y;
             if (Math.sqrt(dx * dx + dy * dy) < PLAYER_COLLECT_RADIUS) {
                 i.active = false;
@@ -279,6 +367,9 @@ export const GameCanvas: React.FC<{
                 } else if (i.type === EntityType.ITEM_LIFE) {
                     stats.current.lives++;
                     audioSynth.playExtend();
+                } else if (i.type === EntityType.ITEM_BIOCHAR) {
+                    stats.current.topography = Math.min(90, (stats.current.topography || 0) + 1);
+                    stats.current.score += 200;
                 } else {
                     stats.current.score += 5000;
                 }
@@ -286,14 +377,19 @@ export const GameCanvas: React.FC<{
             if (i.y > SCREEN_HEIGHT) i.active = false;
         });
 
+
         bulletPool.pool.forEach(b => {
             if (b.active && b.type === EntityType.BULLET_PLAYER) {
                 const dx = b.x - boss.current.x; const dy = b.y - boss.current.y;
                 if (Math.sqrt(dx * dx + dy * dy) < 30) {
+                    if (mode === GameMode.OBSIDIAN_SCRUBBER && Math.random() < 0.1) {
+                        itemPool.spawn(b.x, b.y, (Math.random() - 0.5) * 2, -2, '#E056FD', 6, 6, EntityType.ITEM_BIOCHAR);
+                    }
                     b.active = false;
                     boss.current.health -= 10;
                     stats.current.score += 100;
                     particlePool.spawn(b.x, b.y, PALETTE.BOSS_AURA, 1, 2);
+
 
                     const hpPerPhase = BOSS_MAX_HEALTH / BOSS_TOTAL_PHASES;
                     const currentPhase = Math.floor((BOSS_MAX_HEALTH - boss.current.health) / hpPerPhase);
@@ -303,6 +399,7 @@ export const GameCanvas: React.FC<{
                         shake.current = 15;
                         for (let k = 0; k < 15; k++) itemPool.spawn(boss.current.x, boss.current.y, (Math.random() - 0.5) * 3, -4, PALETTE.ITEM_POWER, 8, 8, EntityType.ITEM_POWER)
                     }
+
 
                     if (boss.current.health <= 0) {
                         boss.current.health = BOSS_MAX_HEALTH;
@@ -315,6 +412,7 @@ export const GameCanvas: React.FC<{
             }
         });
 
+
         if (shake.current > 0) shake.current *= 0.9;
         if (invuln.current > 0) invuln.current--;
         if (bomb.current.active) {
@@ -325,27 +423,41 @@ export const GameCanvas: React.FC<{
             stats.current.lives++; scoreExtends.current[0] = true; audioSynth.playExtend();
         }
 
+
         bgScroll.current = (bgScroll.current + 2) % 40;
+
 
         stats.current.bossHealth = boss.current.health;
         stats.current.bossPhase = boss.current.phase;
         if (frames.current % 10 === 0) setStats({ ...stats.current });
     };
 
+
     const draw = () => {
         const ctx = canvasRef.current?.getContext('2d');
         if (!ctx) return;
 
+
         const cmds = useInputStore.getState().commands; // Read state for visual feedback
+
 
         const sx = (Math.random() - 0.5) * shake.current;
         const sy = (Math.random() - 0.5) * shake.current;
         ctx.save();
         ctx.translate(sx, sy);
 
+
         // BACKGROUND
         ctx.fillStyle = PALETTE.BG_VOID; ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         ctx.fillStyle = "rgba(10, 0, 16, 0.8)"; ctx.fillRect(PLAY_AREA_X, PLAY_AREA_Y, PLAY_AREA_WIDTH, PLAY_AREA_HEIGHT);
+
+
+        if (mode === GameMode.OBSIDIAN_SCRUBBER) {
+            const topogHeight = (PLAY_AREA_HEIGHT * (stats.current.topography || 0)) / 100;
+            ctx.fillStyle = "rgba(224, 86, 253, 0.15)";
+            ctx.fillRect(PLAY_AREA_X, PLAY_AREA_Y + PLAY_AREA_HEIGHT - topogHeight, PLAY_AREA_WIDTH, topogHeight);
+        }
+
 
         ctx.strokeStyle = PALETTE.BG_GRID; ctx.lineWidth = 1;
         for (let y = bgScroll.current; y < SCREEN_HEIGHT; y += 40) {
@@ -353,9 +465,11 @@ export const GameCanvas: React.FC<{
         }
         ctx.strokeRect(PLAY_AREA_X, PLAY_AREA_Y, PLAY_AREA_WIDTH, PLAY_AREA_HEIGHT);
 
+
         ctx.strokeStyle = "rgba(255, 255, 255, 0.2)"; ctx.setLineDash([5, 5]);
         ctx.beginPath(); ctx.moveTo(PLAY_AREA_X, POC_THRESHOLD_Y); ctx.lineTo(PLAY_AREA_X + PLAY_AREA_WIDTH, POC_THRESHOLD_Y); ctx.stroke();
         ctx.setLineDash([]);
+
 
         if (cmds.FOCUS) {
             ctx.fillStyle = '#FFFFFF';
@@ -363,11 +477,13 @@ export const GameCanvas: React.FC<{
             ctx.arc(player.current.x, player.current.y, PLAYER_HITBOX_RADIUS, 0, Math.PI * 2);
             ctx.fill();
 
+
             ctx.strokeStyle = '#FF003C';
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.arc(player.current.x, player.current.y, PLAYER_HITBOX_RADIUS + 1, 0, Math.PI * 2);
             ctx.stroke();
+
 
             ctx.strokeStyle = '#E056FD';
             ctx.setLineDash([2, 2]);
@@ -376,6 +492,7 @@ export const GameCanvas: React.FC<{
             ctx.stroke();
             ctx.setLineDash([]);
         }
+
 
         // BOSS
         if (boss.current.active) {
@@ -393,6 +510,7 @@ export const GameCanvas: React.FC<{
             ctx.restore();
         }
 
+
         const hpWidth = PLAY_AREA_WIDTH;
         ctx.fillStyle = "#330000"; ctx.fillRect(PLAY_AREA_X, PLAY_AREA_Y, hpWidth, 5);
         const phaseMax = BOSS_MAX_HEALTH / BOSS_TOTAL_PHASES;
@@ -400,6 +518,7 @@ export const GameCanvas: React.FC<{
         const pct = phaseCurrent / phaseMax;
         ctx.fillStyle = boss.current.phase === 0 ? '#00FF00' : boss.current.phase === 1 ? '#FFFF00' : '#FF003C';
         ctx.fillRect(PLAY_AREA_X, PLAY_AREA_Y, hpWidth * pct, 5);
+
 
         if (player.current.active && (invuln.current % 4 < 2)) {
             ctx.fillStyle = PALETTE.PLAYER_AURA;
@@ -411,26 +530,31 @@ export const GameCanvas: React.FC<{
             ctx.beginPath(); ctx.moveTo(player.current.x, player.current.y - 15); ctx.lineTo(player.current.x + 10, player.current.y + 10); ctx.lineTo(player.current.x - 10, player.current.y + 10); ctx.fill();
             ctx.fillStyle = PALETTE.PLAYER_CORE; ctx.fillRect(player.current.x - 3, player.current.y - 12, 6, 6);
 
+
             if (cmds.FOCUS) {
                 const rot = frames.current * 0.1;
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
                 ctx.beginPath(); ctx.arc(player.current.x, player.current.y, PLAYER_HITBOX_RADIUS, 0, Math.PI * 2); ctx.stroke();
+
 
                 ctx.strokeStyle = PALETTE.PLAYER_AURA;
                 ctx.beginPath(); ctx.arc(player.current.x, player.current.y, 25, rot, rot + Math.PI); ctx.stroke();
             }
         }
 
+
         if (bomb.current.active) {
             ctx.fillStyle = `rgba(255, 255, 255, ${bomb.current.timer / 120})`;
             ctx.beginPath(); ctx.arc(player.current.x, player.current.y, bomb.current.radius, 0, Math.PI * 2); ctx.fill();
         }
 
+
         particlePool.updateAndDraw(ctx);
         itemPool.pool.forEach(i => {
             if (!i.active) return;
             ctx.fillStyle = i.color; ctx.fillRect(i.x - 4, i.y - 4, 8, 8);
-            ctx.fillStyle = '#000'; ctx.font = "8px monospace"; ctx.fillText(i.type === EntityType.ITEM_POWER ? "P" : "S", i.x - 2, i.y + 2);
+            ctx.fillStyle = '#000'; ctx.font = "8px monospace";
+            ctx.fillText(i.type === EntityType.ITEM_POWER ? "P" : i.type === EntityType.ITEM_BIOCHAR ? "B" : "S", i.x - 2, i.y + 2);
         });
         bulletPool.pool.forEach(b => {
             if (!b.active) return;
@@ -439,7 +563,9 @@ export const GameCanvas: React.FC<{
             ctx.fillStyle = '#fff'; ctx.fillRect(b.x - 1, b.y - 1, 2, 2);
         });
 
+
         ctx.restore();
+
 
         // UI
         const uiX = PLAY_AREA_X + PLAY_AREA_WIDTH + 20;
@@ -457,18 +583,39 @@ export const GameCanvas: React.FC<{
         ctx.fillStyle = "#fff";
         ctx.fillText(`GRAZE: ${stats.current.graze}`, uiX, 310);
 
+        if (mode === GameMode.AETHER_OVERLOAD) {
+            ctx.fillStyle = '#FF003C';
+            ctx.fillText(`PRESSURE: ${Math.floor(stats.current.pressure || 0)}%`, uiX, 340);
+        } else if (mode === GameMode.OBSIDIAN_SCRUBBER) {
+            ctx.fillStyle = '#E056FD';
+            ctx.fillText(`TOPOGRAPHY: ${stats.current.topography}%`, uiX, 340);
+        }
+
+
         if (deathBombTimer.current > 0) {
             ctx.fillStyle = "#FF0000"; ctx.fillText("!! DEATH !!", uiX, 350);
         }
     };
 
+
     useGameLoop((dt) => { update(dt); draw(); }, !isPaused);
+
+
+    const canvasClassNames = `w-full h-full object-contain ${mode === GameMode.AETHER_OVERLOAD && (stats.current.pressure || 0) > 80 ? 'chromatic-aberration-pulse'
+            : mode === GameMode.TELLURIC_RESONANCE ? 'low-latency-grid shadow-[0_0_50px_rgba(255,0,60,0.5)]'
+                : 'shadow-[0_0_30px_rgba(224,86,253,0.3)]'
+        }`;
+
 
     return (
         <div className="relative w-full h-full flex justify-center items-center">
+            {bomb.current.active && (
+                <div className="absolute inset-0 luminescent-discharge pointer-events-none" />
+            )}
             <canvas ref={canvasRef} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}
-                className="w-full h-full object-contain shadow-[0_0_30px_rgba(224,86,253,0.3)]"
+                className={canvasClassNames}
             />
+
 
             {/* MOBILE HARDWARE OVERRIDE */}
             {isMobile && (
@@ -477,6 +624,7 @@ export const GameCanvas: React.FC<{
                     <div className="absolute bottom-12 left-12 z-50">
                         <VirtualJoystick size={150} stickSize={60} />
                     </div>
+
 
                     {/* Right Logic Nodes */}
                     <div className="absolute bottom-16 right-16 flex flex-col gap-6 z-50">

@@ -1,11 +1,14 @@
 import { create } from 'zustand';
 
+
 /**
- * ARCHITECT // VOID_WEAVER
- * PROTOCOL: UNIFIED_INPUT_STATE
- */
+* ARCHITECT // VOID_WEAVER
+* PROTOCOL: UNIFIED_INPUT_STATE
+*/
+
 
 export type CommandNode = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'ACTION' | 'BOMB' | 'FOCUS';
+
 
 interface InputState {
     commands: Record<CommandNode, boolean>;
@@ -13,6 +16,7 @@ interface InputState {
     deviceType: 'PC' | 'MOBILE' | 'CONSOLE';
     setDevice: (type: 'PC' | 'MOBILE' | 'CONSOLE') => void;
 }
+
 
 export const useInputStore = create<InputState>((set) => ({
     commands: {
