@@ -31,28 +31,32 @@ export const App: React.FC = () => {
         if (file) setCustomAudio(URL.createObjectURL(file));
     };
 
-
     useEffect(() => {
         if (customAudio && isPlaying) {
+            audioSynth.init();
+
             if (!audioRef.current) {
                 audioRef.current = new Audio(customAudio);
-                audioSynth.init();
+                audioRef.current.crossOrigin = "anonymous";
                 audioSynth.connectExternalAudio(audioRef.current);
             }
+
             audioRef.current.src = customAudio;
             audioRef.current.loop = true;
             audioRef.current.volume = volume;
 
-            // Re-init audioSynth directly on play gesture to ensure context isn't suspended
-            audioRef.current.play().then(() => {
-                let Ctx = window.AudioContext || (window as any).webkitAudioContext;
-            }).catch(console.error);
+            // Force context resume BEFORE playing to ensure FFT array populates
+            audioSynth.resumeContext().then(() => {
+                audioRef.current?.play().catch(console.error);
+            });
         }
-        return () => { audioRef.current?.pause(); };
+
+        return () => {
+            if (audioRef.current && !isPlaying) {
+                audioRef.current.pause();
+            }
+        };
     }, [customAudio, isPlaying, volume]);
-
-
-
 
     const startSequence = () => setShowStory(true);
     const concludeStory = () => { setShowStory(false); setIsPlaying(true); };

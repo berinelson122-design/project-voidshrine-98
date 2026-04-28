@@ -55,7 +55,6 @@ export const useUniversalInput = () => {
     window.addEventListener('keydown', (e) => handleKey(e, true));
     window.addEventListener('keyup', (e) => handleKey(e, false));
 
-
     return () => {
       window.removeEventListener('keydown', (e) => handleKey(e, true));
       window.removeEventListener('keyup', (e) => handleKey(e, false));

@@ -12,7 +12,8 @@ export const ModeSelector: React.FC<{
         { id: GameMode.TELLURIC_RESONANCE, name: "TELLURIC RESONANCE", desc: "Rhythm-Bullet Hybrid // Synced to Loaded Ark MP3." },
         { id: GameMode.AETHER_OVERLOAD, name: "AETHER OVERLOAD", desc: "High-Risk/High-Reward // Auto-fire // Graze for pressure." },
         { id: GameMode.OBSIDIAN_SCRUBBER, name: "OBSIDIAN SCRUBBER", desc: "Procedural Bioremediation // Re-code the server." },
-        { id: GameMode.PHASE_SHIFT, name: "PHASE SHIFT", desc: "Vector Manipulation // Energy Scavenging via Focus." }
+        { id: GameMode.PHASE_SHIFT, name: "PHASE SHIFT", desc: "Vector Manipulation // Energy Scavenging via Focus." },
+        { id: GameMode.ENDLESS, name: "ENDLESS RECURSION", desc: "Infinite Procedural Danmaku // Scaling Difficulty." }
     ];
 
 
@@ -25,8 +26,8 @@ export const ModeSelector: React.FC<{
                         key={m.id}
                         onClick={() => onSelect(m.id)}
                         className={`text-left p-2 border transition-all ${selectedMode === m.id
-                                ? 'border-[#FF003C] bg-[#FF003C]/20 text-[#fff] shadow-[0_0_10px_#FF003C]'
-                                : 'border-[#333] hover:border-[#E056FD] hover:bg-[#E056FD]/10 text-[#aaa]'
+                            ? 'border-[#FF003C] bg-[#FF003C]/20 text-[#fff] shadow-[0_0_10px_#FF003C]'
+                            : 'border-[#333] hover:border-[#E056FD] hover:bg-[#E056FD]/10 text-[#aaa]'
                             }`}
                     >
                         <div className="text-sm font-bold">{m.name}</div>

@@ -10,6 +10,7 @@ import { audioSynth } from '../services/AudioSynth';
 import { Zap, Target, Crosshair } from 'lucide-react';
 import { useInputStore } from '../store/useInputStore';
 import { VirtualJoystick } from './ui/VirtualJoystick';
+import { generateInfinitePattern } from '../utils/PattermEngine';
 
 
 // --- ENTITY POOL ARCHITECTURE ---
@@ -38,7 +39,6 @@ class EntityPool {
     }
 }
 
-
 class ParticlePool {
     pool: any[];
     constructor() {
@@ -66,11 +66,9 @@ class ParticlePool {
     }
 }
 
-
 const bulletPool = new EntityPool(MAX_BULLETS, EntityType.BULLET_ENEMY);
 const itemPool = new EntityPool(MAX_ITEMS, EntityType.ITEM_POWER);
 const particlePool = new ParticlePool();
-
 
 export const GameCanvas: React.FC<{
     customAudioSrc: string | null;
@@ -80,14 +78,15 @@ export const GameCanvas: React.FC<{
     mode: GameMode;
 }> = ({ customAudioSrc, setStats, onGameOver, isPaused, mode }) => {
 
-
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isMobile, setIsMobile] = useState(false);
 
 
     // GAME STATE
     const player = useRef<Entity>({ id: -1, active: true, type: EntityType.PLAYER, x: 320, y: 400, dx: 0, dy: 0, width: 0, height: 0, color: PALETTE.PLAYER_CORE });
-    const boss = useRef({ active: true, x: 320, y: 100, health: BOSS_MAX_HEALTH, phase: 0, timer: 0, rotation: 0 });
+    const boss = useRef({
+        active: true, x: 320, y: 100, health: BOSS_MAX_HEALTH, phase: 0, timer: 0, rotation: 0, currentPattern: null as any, patternTimer: 0, patternCooldown: 0, scale: 1 // For audio-reactive pulsing
+    });
     const bomb = useRef({ active: false, radius: 0, timer: 0 });
     const shake = useRef(0);
     const invuln = useRef(0);
@@ -247,18 +246,67 @@ export const GameCanvas: React.FC<{
             if (cmds.ACTION && frames.current % 4 === 0) firePlayer(cmds.FOCUS);
         }
 
-
         // --- ENEMY/BULLET LOGIC (UNCHANGED) ---
+        // --- ENDLESS BOSS LOGIC START ---
         boss.current.timer++;
         boss.current.rotation += 0.02;
         boss.current.x = (PLAY_AREA_X + PLAY_AREA_WIDTH / 2) + Math.sin(boss.current.timer * 0.015) * 60;
         boss.current.y = 100 + Math.cos(boss.current.timer * 0.02) * 20;
 
-
         if (boss.current.active) {
             const t = boss.current.timer;
-            const phase = boss.current.phase;
+            const phase = stats.current.bossPhase;
 
+            if (mode === GameMode.ENDLESS) {
+                if (boss.current.health <= 0) {
+                    stats.current.bossPhase++;
+                    boss.current.health = BOSS_MAX_HEALTH + (stats.current.bossPhase * 1000);
+                    boss.current.timer = 0;
+                    bulletPool.clear(particlePool);
+                    audioSynth.playExtend();
+                    shake.current = 15;
+                    boss.current.currentPattern = generateInfinitePattern(stats.current.bossPhase);
+                }
+
+                const p = boss.current.currentPattern || generateInfinitePattern(0);
+
+                switch (p.type) {
+                    case 'SPIRAL':
+                        if (t % 2 === 0) {
+                            const a = t * p.rotationSpeed;
+                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * p.speed, Math.sin(a) * p.speed, p.color);
+                        }
+                        break;
+                    case 'FAN':
+                        if (t % 30 === 0) {
+                            for (let i = 0; i < p.count; i++) {
+                                const a = (Math.PI * 2 / p.count) * i + (t * 0.01);
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * p.speed, Math.sin(a) * p.speed, p.color);
+                            }
+                        }
+                        break;
+                    case 'AIMED':
+                        if (t % 40 === 0) {
+                            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
+                            for (let i = -2; i <= 2; i++) {
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.15) * (p.speed + 1), Math.sin(aim + i * 0.15) * (p.speed + 1), p.color);
+                            }
+                        }
+                        break;
+                    case 'BURST':
+                        if (t % 60 === 0) {
+                            for (let j = 0; j < 3; j++) {
+                                const offset = j * 0.5;
+                                for (let i = 0; i < Math.floor(p.count / 2); i++) {
+                                    const a = (Math.PI * 2 / (p.count / 2)) * i + offset;
+                                    bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * p.speed, Math.sin(a) * p.speed, p.color);
+                                }
+                            }
+                        }
+                        break;
+                }
+            }
+            // --- ENDLESS BOSS LOGIC END ---
 
             if (mode === GameMode.TELLURIC_RESONANCE) {
                 const spec = audioSynth.getSpectrum();
@@ -602,8 +650,8 @@ export const GameCanvas: React.FC<{
 
 
     const canvasClassNames = `w-full h-full object-contain ${mode === GameMode.AETHER_OVERLOAD && (stats.current.pressure || 0) > 80 ? 'chromatic-aberration-pulse'
-            : mode === GameMode.TELLURIC_RESONANCE ? 'low-latency-grid shadow-[0_0_50px_rgba(255,0,60,0.5)]'
-                : 'shadow-[0_0_30px_rgba(224,86,253,0.3)]'
+        : mode === GameMode.TELLURIC_RESONANCE ? 'low-latency-grid shadow-[0_0_50px_rgba(255,0,60,0.5)]'
+            : 'shadow-[0_0_30px_rgba(224,86,253,0.3)]'
         }`;
 
 

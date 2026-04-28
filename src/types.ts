@@ -1,9 +1,10 @@
 export enum GameMode {
   NORMAL,
   TELLURIC_RESONANCE,
+  ENDLESS,
   AETHER_OVERLOAD,
   OBSIDIAN_SCRUBBER,
-  PHASE_SHIFT
+  PHASE_SHIFT,
 }
 
 
@@ -60,4 +61,12 @@ export interface GameStats {
   hiscore: number;
   pressure?: number;
   topography?: number;
+}
+export interface PatternConfig {
+  count: number;
+  speed: number;
+  spread: number;
+  rotationSpeed: number;
+  color: string;
+  type: 'FAN' | 'SPIRAL' | 'AIMED' | 'BURST';
 }
