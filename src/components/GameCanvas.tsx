@@ -140,22 +140,25 @@ export const GameCanvas: React.FC<{
 
 
     const finalizeDeath = () => {
-        stats.current.lives--;
+        // --- MODE OVERRIDE: INFINITE LIVES ---
+        if (mode !== GameMode.ENDLESS) {
+            stats.current.lives--;
+        }
+        // -------------------------------------
+
         stats.current.power = Math.max(0, stats.current.power - 20);
         stats.current.bombs = 3;
         invuln.current = 180;
         particlePool.spawn(player.current.x, player.current.y, PALETTE.PLAYER_AURA, 50, 6);
         bulletPool.clear(particlePool);
 
-
         for (let k = 0; k < 5; k++) itemPool.spawn(boss.current.x, boss.current.y, (Math.random() - 0.5) * 5, -5, PALETTE.ITEM_POWER, 8, 8, EntityType.ITEM_POWER);
-
 
         player.current.x = PLAY_AREA_X + PLAY_AREA_WIDTH / 2;
         player.current.y = PLAY_AREA_Y + PLAY_AREA_HEIGHT - 30;
 
-
-        if (stats.current.lives < 0) {
+        // Game Over should only trigger if NOT in Endless
+        if (stats.current.lives < 0 && mode !== GameMode.ENDLESS) {
             if (stats.current.score > stats.current.hiscore) {
                 localStorage.setItem('SHRINE98_HISCORE', stats.current.score.toString());
             }
@@ -190,10 +193,20 @@ export const GameCanvas: React.FC<{
         if (isPaused || !player.current.active) return;
         frames.current++;
 
-
         // 1. UPLINK TO GLOBAL INPUT STATE
-        const cmds = useInputStore.getState().commands;
+        const inputState = useInputStore.getState();
+        let cmds = inputState.commands;
 
+        // --- GHOST NODE INTERCEPT ---
+        if (inputState.isGhostMode && inputState.ghostData.length > 0) {
+            if (frames.current < inputState.ghostData.length) {
+                cmds = inputState.ghostData[frames.current]; // Playback
+            } else {
+                cmds = { UP: false, DOWN: false, LEFT: false, RIGHT: false, ACTION: false, BOMB: false, FOCUS: false }; // End of run
+            }
+        } else if (inputState.isRecording) {
+            inputState.recordFrame(cmds); // Record
+        }
 
         if (deathBombTimer.current > 0) {
             deathBombTimer.current--;
@@ -328,23 +341,156 @@ export const GameCanvas: React.FC<{
                         }
                     }
                 }
-            } else if (phase === 0 && t % 20 === 0) {
-                const count = 20;
-                for (let i = 0; i < count; i++) {
-                    const a = (Math.PI * 2 / count) * i + t * 0.05;
-                    bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 3, Math.sin(a) * 3, PALETTE.BULLET_ENEMY, 8, 8);
+            } else {
+                // --- START NEW CODE: TEN ADDITIONAL BOSS PHASES & SCALING DIFFICULTY (15 PHASES TOTAL) ---
+                switch (phase) {
+                    case 0: // Phase 1/15: Sub-Zero Radial Expansion
+                        if (t % 20 === 0) {
+                            const count = 20;
+                            for (let i = 0; i < count; i++) {
+                                const a = (Math.PI * 2 / count) * i + t * 0.05;
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 3, Math.sin(a) * 3, PALETTE.BULLET_ENEMY, 8, 8);
+                            }
+                        }
+                        break;
+                    case 1: // Phase 2/15: Dual Helix Counter-Rotating Spirals
+                        if (t % 4 === 0) {
+                            const a = t * 0.2;
+                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 4, Math.sin(a) * 4, '#FF00FF', 8, 8);
+                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a + 2) * 4, Math.sin(a + 2) * 4, '#00FFFF', 8, 8);
+                        }
+                        break;
+                    case 2: // Phase 3/15: Aimed 5-Way Fan Barrage
+                        if (t % 50 === 0) {
+                            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
+                            for (let i = -2; i <= 2; i++) {
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.12) * 4.8, Math.sin(aim + i * 0.12) * 4.8, '#FF003C', 10, 10);
+                            }
+                        }
+                        break;
+                    case 3: // Phase 4/15: Star Nova Burst
+                        if (t % 45 === 0) {
+                            for (let i = 0; i < 8; i++) {
+                                const baseA = (Math.PI * 2 / 8) * i + t * 0.03;
+                                for (let j = 1; j <= 3; j++) {
+                                    bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(baseA) * (2.5 + j * 0.8), Math.sin(baseA) * (2.5 + j * 0.8), '#E056FD', 8, 8);
+                                }
+                            }
+                        }
+                        break;
+                    case 4: // Phase 5/15: Accelerating Double Spiral Cannon
+                        if (t % 3 === 0) {
+                            const a1 = t * 0.15;
+                            const a2 = -t * 0.15;
+                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a1) * 5.2, Math.sin(a1) * 5.2, '#39FF14', 6, 6);
+                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a2) * 5.2, Math.sin(a2) * 5.2, '#FFD700', 6, 6);
+                        }
+                        break;
+                    case 5: // Phase 6/15: Homing Seeker Swarm + Outer Curtain Ring
+                        if (t % 35 === 0) {
+                            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
+                            for (let i = -1; i <= 1; i++) {
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.25) * 5.5, Math.sin(aim + i * 0.25) * 5.5, '#FF003C', 8, 8);
+                            }
+                            for (let i = 0; i < 16; i++) {
+                                const a = (Math.PI * 2 / 16) * i;
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 2.8, Math.sin(a) * 2.8, '#00F3FF', 8, 8);
+                            }
+                        }
+                        break;
+                    case 6: // Phase 7/15: Intersecting Crossfire Grid Matrix
+                        if (t % 40 === 0) {
+                            for (let i = -3; i <= 3; i++) {
+                                const offsetX = i * 25;
+                                bulletPool.spawn(boss.current.x + offsetX, boss.current.y, 0, 4.5, '#E056FD', 8, 8);
+                                const a = (Math.PI / 4) + i * 0.15;
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 4.5, Math.sin(a) * 4.5, '#FF003C', 8, 8);
+                            }
+                        }
+                        break;
+                    case 7: // Phase 8/15: Dynamic Void Vortex Shockwave
+                        if (t % 12 === 0) {
+                            const a = t * 0.25;
+                            const spd = 3.5 + Math.sin(t * 0.05) * 1.5;
+                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * spd, Math.sin(a) * spd, '#00FFFF', 8, 8);
+                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a + Math.PI) * spd, Math.sin(a + Math.PI) * spd, '#FF00FF', 8, 8);
+                        }
+                        break;
+                    case 8: // Phase 9/15: 12-Petal Blossom Cascade
+                        if (t % 30 === 0) {
+                            for (let i = 0; i < 12; i++) {
+                                const a = (Math.PI * 2 / 12) * i + Math.sin(t * 0.1) * 0.5;
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 5.8, Math.sin(a) * 5.8, '#FFD700', 8, 8);
+                            }
+                        }
+                        break;
+                    case 9: // Phase 10/15: High-Speed 3-Stream Needle Barrage
+                        if (t % 10 === 0) {
+                            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
+                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim) * 7.5, Math.sin(aim) * 7.5, '#FF003C', 4, 16);
+                            bulletPool.spawn(boss.current.x - 15, boss.current.y, Math.cos(aim - 0.1) * 7.2, Math.sin(aim - 0.1) * 7.2, '#E056FD', 4, 16);
+                            bulletPool.spawn(boss.current.x + 15, boss.current.y, Math.cos(aim + 0.1) * 7.2, Math.sin(aim + 0.1) * 7.2, '#E056FD', 4, 16);
+                        }
+                        break;
+                    case 10: // Phase 11/15: Chaos Explosion Nova
+                        if (t % 25 === 0) {
+                            for (let i = 0; i < 18; i++) {
+                                const a = Math.random() * Math.PI * 2;
+                                const spd = 3.5 + Math.random() * 4.5;
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * spd, Math.sin(a) * spd, '#39FF14', 8, 8);
+                            }
+                        }
+                        break;
+                    case 11: // Phase 12/15: Concentric Shockwave Rings + Sniper Aimed Shots
+                        if (t % 35 === 0) {
+                            for (let i = 0; i < 28; i++) {
+                                const a = (Math.PI * 2 / 28) * i;
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 4.2, Math.sin(a) * 4.2, '#00F3FF', 8, 8);
+                            }
+                            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
+                            for (let i = -1; i <= 1; i++) {
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.08) * 8.0, Math.sin(aim + i * 0.08) * 8.0, '#FF003C', 6, 12);
+                            }
+                        }
+                        break;
+                    case 12: // Phase 13/15: Quad Cross-Spiral Storm + Aimed Fan Bursts
+                        if (t % 2 === 0) {
+                            for (let k = 0; k < 4; k++) {
+                                const a = t * 0.15 + (Math.PI / 2) * k;
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 6.0, Math.sin(a) * 6.0, '#FF00FF', 6, 6);
+                            }
+                        }
+                        if (t % 40 === 0) {
+                            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
+                            for (let i = -2; i <= 2; i++) {
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.15) * 6.5, Math.sin(aim + i * 0.15) * 6.5, '#FFD700', 8, 8);
+                            }
+                        }
+                        break;
+                    case 13: // Phase 14/15: Imploding Singularity Sphere & Radial Eruption
+                        if (t % 50 === 0) {
+                            for (let i = 0; i < 36; i++) {
+                                const a = (Math.PI * 2 / 36) * i + (t * 0.02);
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 6.8, Math.sin(a) * 6.8, '#E056FD', 8, 8);
+                            }
+                        }
+                        break;
+                    case 14: default: // Phase 15/15: Absolute Void Overdrive (Climax Final Phase)
+                        if (t % 2 === 0) {
+                            const a1 = t * 0.2;
+                            const a2 = -t * 0.2;
+                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a1) * 6.5, Math.sin(a1) * 6.5, '#FF003C', 8, 8);
+                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a2) * 6.5, Math.sin(a2) * 6.5, '#00F3FF', 8, 8);
+                        }
+                        if (t % 25 === 0) {
+                            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
+                            for (let i = -5; i <= 5; i++) {
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.1) * 7.5, Math.sin(aim + i * 0.1) * 7.5, '#FFD700', 6, 14);
+                            }
+                        }
+                        break;
                 }
-            }
-            else if (phase === 1 && t % 4 === 0) {
-                const a = t * 0.2;
-                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 4, Math.sin(a) * 4, '#FF00FF', 8, 8);
-                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a + 2) * 4, Math.sin(a + 2) * 4, '#00FFFF', 8, 8);
-            }
-            else if (phase === 2 && t % 60 === 0) {
-                const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
-                for (let i = -5; i <= 5; i++) {
-                    bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.1) * 5, Math.sin(aim + i * 0.1) * 5, '#FF003C', 10, 10);
-                }
+                // --- END NEW CODE ---
             }
         }
 
@@ -561,11 +707,14 @@ export const GameCanvas: React.FC<{
 
         const hpWidth = PLAY_AREA_WIDTH;
         ctx.fillStyle = "#330000"; ctx.fillRect(PLAY_AREA_X, PLAY_AREA_Y, hpWidth, 5);
+        // --- START NEW CODE: SCALING BOSS PHASE COLOR PALETTE ---
         const phaseMax = BOSS_MAX_HEALTH / BOSS_TOTAL_PHASES;
         const phaseCurrent = boss.current.health % phaseMax || phaseMax;
         const pct = phaseCurrent / phaseMax;
-        ctx.fillStyle = boss.current.phase === 0 ? '#00FF00' : boss.current.phase === 1 ? '#FFFF00' : '#FF003C';
+        const phaseColors = ['#00FF00', '#39FF14', '#00F3FF', '#00FFFF', '#E056FD', '#FF00FF', '#FFD700', '#FFA500', '#FF4500', '#FF003C', '#FF0055', '#D100D1', '#9900FF', '#00E5FF', '#FFFFFF'];
+        ctx.fillStyle = phaseColors[boss.current.phase % phaseColors.length] || '#FF003C';
         ctx.fillRect(PLAY_AREA_X, PLAY_AREA_Y, hpWidth * pct, 5);
+        // --- END NEW CODE ---
 
 
         if (player.current.active && (invuln.current % 4 < 2)) {
@@ -616,7 +765,15 @@ export const GameCanvas: React.FC<{
 
 
         // UI
+        // UI (Lives Indicator)
         const uiX = PLAY_AREA_X + PLAY_AREA_WIDTH + 20;
+
+        // If Endless, show infinite symbol, otherwise show hearts
+        const livesDisplay = mode === GameMode.ENDLESS ? "∞" : "♥".repeat(Math.max(0, stats.current.lives));
+        ctx.fillText(`LIVES: ${livesDisplay}`, uiX, 190);
+
+
+
         ctx.font = "24px monospace"; ctx.fillStyle = PALETTE.TEXT_PRIMARY; ctx.fillText("SHRINE-98", uiX, 40);
         ctx.font = "18px monospace"; ctx.fillStyle = "#fff";
         ctx.fillText(`SCORE:`, uiX, 80);
@@ -631,17 +788,30 @@ export const GameCanvas: React.FC<{
         ctx.fillStyle = "#fff";
         ctx.fillText(`GRAZE: ${stats.current.graze}`, uiX, 310);
 
+        // --- START NEW CODE: BOSS PHASE UI HUD DISPLAY ---
+        ctx.fillStyle = "#E056FD";
+        ctx.fillText(`PHASE: ${boss.current.phase + 1}/${BOSS_TOTAL_PHASES}`, uiX, 340);
+        // --- END NEW CODE ---
+
         if (mode === GameMode.AETHER_OVERLOAD) {
             ctx.fillStyle = '#FF003C';
-            ctx.fillText(`PRESSURE: ${Math.floor(stats.current.pressure || 0)}%`, uiX, 340);
+            ctx.fillText(`PRESSURE: ${Math.floor(stats.current.pressure || 0)}%`, uiX, 370);
         } else if (mode === GameMode.OBSIDIAN_SCRUBBER) {
             ctx.fillStyle = '#E056FD';
-            ctx.fillText(`TOPOGRAPHY: ${stats.current.topography}%`, uiX, 340);
+            ctx.fillText(`TOPOGRAPHY: ${stats.current.topography}%`, uiX, 370);
         }
 
 
         if (deathBombTimer.current > 0) {
             ctx.fillStyle = "#FF0000"; ctx.fillText("!! DEATH !!", uiX, 350);
+        }
+
+        if (useInputStore.getState().isGhostMode) {
+            ctx.fillStyle = '#FF003C';
+            ctx.fillText("GHOST_NODE_ACTIVE", uiX, 380);
+        } else if (useInputStore.getState().isRecording) {
+            ctx.fillStyle = '#FF003C';
+            ctx.fillText("REC_GHOST_DATA", uiX, 380);
         }
     };
 

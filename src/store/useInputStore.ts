@@ -1,31 +1,40 @@
 import { create } from 'zustand';
 
-
-/**
-* ARCHITECT // VOID_WEAVER
-* PROTOCOL: UNIFIED_INPUT_STATE
-*/
-
-
 export type CommandNode = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'ACTION' | 'BOMB' | 'FOCUS';
-
+export type InputCommands = Record<CommandNode, boolean>;
 
 interface InputState {
-    commands: Record<CommandNode, boolean>;
+    commands: InputCommands;
     setCommand: (cmd: CommandNode, active: boolean) => void;
-    deviceType: 'PC' | 'MOBILE' | 'CONSOLE';
-    setDevice: (type: 'PC' | 'MOBILE' | 'CONSOLE') => void;
+    deviceType: 'PC' | 'MOBILE' | 'CONSOLE' | 'GHOST';
+    setDevice: (type: 'PC' | 'MOBILE' | 'CONSOLE' | 'GHOST') => void;
+
+    // GHOST NODE VARIABLES
+    isGhostMode: boolean;
+    isRecording: boolean;
+    ghostData: InputCommands[];
+    setGhostMode: (active: boolean, data?: InputCommands[]) => void;
+    setRecording: (active: boolean) => void;
+    recordFrame: (cmds: InputCommands) => void;
+    clearRecording: () => void;
 }
 
+const emptyCommands: InputCommands = { UP: false, DOWN: false, LEFT: false, RIGHT: false, ACTION: false, BOMB: false, FOCUS: false };
 
 export const useInputStore = create<InputState>((set) => ({
-    commands: {
-        UP: false, DOWN: false, LEFT: false, RIGHT: false,
-        ACTION: false, BOMB: false, FOCUS: false
-    },
+    commands: { ...emptyCommands },
     deviceType: 'PC',
+
+    isGhostMode: false,
+    isRecording: false,
+    ghostData: [],
+
     setDevice: (deviceType) => set({ deviceType }),
-    setCommand: (cmd, active) => set((state) => ({
-        commands: { ...state.commands, [cmd]: active }
-    })),
+    setCommand: (cmd, active) => set((state) => ({ commands: { ...state.commands, [cmd]: active } })),
+
+    // GHOST ACTIONS
+    setGhostMode: (active, data = []) => set({ isGhostMode: active, ghostData: data, deviceType: active ? 'GHOST' : 'PC' }),
+    setRecording: (active) => set({ isRecording: active }),
+    recordFrame: (cmds) => set((state) => ({ ghostData: [...state.ghostData, { ...cmds }] })),
+    clearRecording: () => set({ ghostData: [] })
 }));

@@ -61,6 +61,41 @@ export const useUniversalInput = () => {
     };
   }, [setCommand]);
 
+  // --- START NEW CODE: CONSOLE GAMEPAD CONTROLLER SUPPORT ---
+  useEffect(() => {
+    let animId: number;
+    const pollGamepad = () => {
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const gp = gamepads[0] || gamepads[1];
+      if (gp) {
+        const axisX = gp.axes[0] || 0;
+        const axisY = gp.axes[1] || 0;
+        const dUp = gp.buttons[12]?.pressed;
+        const dDown = gp.buttons[13]?.pressed;
+        const dLeft = gp.buttons[14]?.pressed;
+        const dRight = gp.buttons[15]?.pressed;
+
+        setCommand('UP', Boolean(dUp || axisY < -0.3));
+        setCommand('DOWN', Boolean(dDown || axisY > 0.3));
+        setCommand('LEFT', Boolean(dLeft || axisX < -0.3));
+        setCommand('RIGHT', Boolean(dRight || axisX > 0.3));
+
+        const btnAction = gp.buttons[0]?.pressed || gp.buttons[7]?.pressed;
+        const btnBomb = gp.buttons[1]?.pressed || gp.buttons[6]?.pressed;
+        const btnFocus = gp.buttons[2]?.pressed || gp.buttons[5]?.pressed;
+
+        if (btnAction !== undefined) setCommand('ACTION', Boolean(btnAction));
+        if (btnBomb !== undefined) setCommand('BOMB', Boolean(btnBomb));
+        if (btnFocus !== undefined) setCommand('FOCUS', Boolean(btnFocus));
+      }
+      animId = requestAnimationFrame(pollGamepad);
+    };
+
+    pollGamepad();
+    return () => cancelAnimationFrame(animId);
+  }, [setCommand]);
+  // --- END NEW CODE ---
+
 
   return { setCommand };
 };

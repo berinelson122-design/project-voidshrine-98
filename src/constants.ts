@@ -33,8 +33,9 @@ export const POC_THRESHOLD_Y = PLAY_AREA_Y + 100;
 export const DEATHBOMB_WINDOW = 12;
 export const SCORE_EXTEND_1 = 10000000;
 export const SCORE_EXTEND_2 = 20000000;
-export const BOSS_TOTAL_PHASES = 5;
-
+// --- START NEW CODE: TEN ADDITIONAL BOSS PHASES & SCALING DIFFICULTY ---
+export const BOSS_TOTAL_PHASES = 15;
+// --- END NEW CODE ---
 
 export const MAX_BULLETS = 2500;
 export const MAX_PARTICLES = 500;
