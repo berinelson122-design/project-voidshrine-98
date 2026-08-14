@@ -5,13 +5,12 @@ import {
     MAX_BULLETS, MAX_ITEMS, MAX_PARTICLES, PLAYER_SPEED, PLAYER_FOCUS_SPEED,
     PLAYER_HITBOX_RADIUS, PLAYER_GRAZE_RADIUS, PLAYER_COLLECT_RADIUS, BOSS_MAX_HEALTH, BOSS_TOTAL_PHASES, POC_THRESHOLD_Y, DEATHBOMB_WINDOW, SCORE_EXTEND_1
 } from '../constants';
-import { Entity, EntityType, GameStats, GameMode } from '../types';
+import { Entity, EntityType, GameStats, GameMode, NULL_OMENS, NullOmenDefinition } from '../types';
 import { audioSynth } from '../services/AudioSynth';
-import { Zap, Target, Crosshair } from 'lucide-react';
+import { Zap, Target, Crosshair, Sparkles } from 'lucide-react';
 import { useInputStore } from '../store/useInputStore';
 import { VirtualJoystick } from './ui/VirtualJoystick';
-import { generateInfinitePattern } from '../utils/PattermEngine';
-
+import { generateInfinitePattern } from '../utils/PatternEngine';
 
 // --- ENTITY POOL ARCHITECTURE ---
 class EntityPool {
@@ -21,19 +20,24 @@ class EntityPool {
             id: i, active: false, x: 0, y: 0, dx: 0, dy: 0, width: 0, height: 0, color: '#fff', type: defaultType, homing: false
         }));
     }
-    spawn(x: number, y: number, dx: number, dy: number, color: string = '#fff', w: number = 8, h: number = 8, type: EntityType = EntityType.BULLET_ENEMY) {
+    spawn(x: number, y: number, dx: number, dy: number, color: string = '#fff', w: number = 8, h: number = 8, type: EntityType = EntityType.BULLET_ENEMY, life = 0) {
         const e = this.pool.find(i => !i.active);
         if (e) {
             e.active = true; e.x = x; e.y = y; e.dx = dx; e.dy = dy;
             e.color = color; e.width = w; e.height = h; e.grazed = false; e.type = type; e.homing = false;
             e.rotation = Math.atan2(dy, dx);
+            e.life = life;
+            e.maxLife = life;
         }
     }
-    clear(particlePool: ParticlePool) {
+    clear(particlePool: ParticlePool, itemPool?: EntityPool) {
         this.pool.forEach(e => {
             if (e.active && e.type === EntityType.BULLET_ENEMY) {
                 e.active = false;
                 particlePool.spawn(e.x, e.y, e.color, 2, 2);
+                if (itemPool && Math.random() < 0.3) {
+                    itemPool.spawn(e.x, e.y, 0, -2, PALETTE.ITEM_POINT, 8, 8, EntityType.ITEM_POINT);
+                }
             }
         });
     }
@@ -68,6 +72,7 @@ class ParticlePool {
 
 const bulletPool = new EntityPool(MAX_BULLETS, EntityType.BULLET_ENEMY);
 const itemPool = new EntityPool(MAX_ITEMS, EntityType.ITEM_POWER);
+const spellPool = new EntityPool(200, EntityType.SPELL_SHARD);
 const particlePool = new ParticlePool();
 
 export const GameCanvas: React.FC<{
@@ -76,16 +81,15 @@ export const GameCanvas: React.FC<{
     onGameOver: () => void;
     isPaused: boolean;
     mode: GameMode;
-}> = ({ customAudioSrc, setStats, onGameOver, isPaused, mode }) => {
-
+}> = ({ setStats, onGameOver, isPaused, mode }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isMobile, setIsMobile] = useState(false);
+    const [availableOmen, setAvailableOmen] = useState<NullOmenDefinition | null>(null);
 
-
-    // GAME STATE
+    // GAME REFS
     const player = useRef<Entity>({ id: -1, active: true, type: EntityType.PLAYER, x: 320, y: 400, dx: 0, dy: 0, width: 0, height: 0, color: PALETTE.PLAYER_CORE });
     const boss = useRef({
-        active: true, x: 320, y: 100, health: BOSS_MAX_HEALTH, phase: 0, timer: 0, rotation: 0, currentPattern: null as any, patternTimer: 0, patternCooldown: 0, scale: 1 // For audio-reactive pulsing
+        active: true, x: 320, y: 100, health: BOSS_MAX_HEALTH, phase: 0, timer: 0, rotation: 0, currentPattern: null as any, scale: 1
     });
     const bomb = useRef({ active: false, radius: 0, timer: 0 });
     const shake = useRef(0);
@@ -93,21 +97,30 @@ export const GameCanvas: React.FC<{
     const deathBombTimer = useRef(0);
     const bgScroll = useRef(0);
     const scoreExtends = useRef([false, false]);
-    const stats = useRef<GameStats>({ score: 0, lives: 3, bombs: 3, power: 0, graze: 0, bossHealth: BOSS_MAX_HEALTH, bossPhase: 0, fps: 60, hiscore: 0, pressure: 0, topography: 0 });
+    const stats = useRef<GameStats>({ score: 0, lives: 3, bombs: 3, power: 0, graze: 0, bossHealth: BOSS_MAX_HEALTH, bossPhase: 0, fps: 60, hiscore: 0, pressure: 0, topography: 0, activeOmen: null });
     const frames = useRef(0);
 
+    // --- NULL OMEN ACTIVE STATE ---
+    const activeSpell = useRef<{
+        omen: NullOmenDefinition | null;
+        timer: number;
+        bannerSlide: number;
+        stasisActive: boolean;
+    }>({
+        omen: null,
+        timer: 0,
+        bannerSlide: 0,
+        stasisActive: false,
+    });
 
-    // --- INITIALIZATION ---
     useEffect(() => {
         setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0);
         const initAudio = () => audioSynth.init();
         window.addEventListener('click', initAudio);
         window.addEventListener('touchstart', initAudio);
 
-
         const saved = localStorage.getItem('SHRINE98_HISCORE');
         if (saved) stats.current.hiscore = parseInt(saved);
-
 
         return () => {
             window.removeEventListener('click', initAudio);
@@ -115,6 +128,12 @@ export const GameCanvas: React.FC<{
         };
     }, []);
 
+    // Compute highest unlocked Null Omen based on Power milestones (32, 64, 96, 128)
+    const getHighestUnlockedOmen = (pwr: number): NullOmenDefinition | null => {
+        const eligible = NULL_OMENS.filter(o => pwr >= o.requiredPower);
+        if (eligible.length === 0) return null;
+        return eligible[eligible.length - 1];
+    };
 
     const triggerBomb = () => {
         if (stats.current.bombs > 0 && !bomb.current.active) {
@@ -122,7 +141,7 @@ export const GameCanvas: React.FC<{
             bomb.current.active = true; bomb.current.timer = 120; bomb.current.radius = 10;
             shake.current = 15;
             audioSynth.playBomb();
-            bulletPool.clear(particlePool);
+            bulletPool.clear(particlePool, itemPool);
             if (deathBombTimer.current > 0) {
                 deathBombTimer.current = 0;
                 invuln.current = 120;
@@ -130,6 +149,57 @@ export const GameCanvas: React.FC<{
         }
     };
 
+    // --- START NEW CODE: LAUNCH NULL OMEN SPELL CARD PROTOCOL ---
+    const launchNullOmen = () => {
+        if (activeSpell.current.timer > 0) return; // Spell currently in execution
+        const omen = getHighestUnlockedOmen(stats.current.power);
+        if (!omen) return;
+
+        // Deduct power points cost
+        stats.current.power = Math.max(0, stats.current.power - omen.powerCost);
+        activeSpell.current.omen = omen;
+        activeSpell.current.timer = omen.duration;
+        activeSpell.current.bannerSlide = 0;
+        activeSpell.current.stasisActive = omen.id === 'thermodynamic_shatter';
+
+        stats.current.activeOmen = `${omen.sign} [${omen.name}]`;
+        stats.current.score += 250000;
+
+        audioSynth.playSpellCard();
+        shake.current = 25;
+        bulletPool.clear(particlePool, itemPool);
+        invuln.current = omen.duration + 60;
+
+        // Trigger unique mechanical payload
+        switch (omen.id) {
+            case 'hollow_abyss':
+                boss.current.health = Math.max(1, boss.current.health - 800);
+                particlePool.spawn(boss.current.x, boss.current.y, omen.color, 40, 8);
+                break;
+
+            case 'tearing_darkness':
+                audioSynth.playLaser();
+                boss.current.health = Math.max(1, boss.current.health - 1600);
+                shake.current = 35;
+                break;
+
+            case 'byte_basher':
+                for (let i = 0; i < 32; i++) {
+                    const a = (Math.PI * 2 / 32) * i;
+                    spellPool.spawn(player.current.x, player.current.y, Math.cos(a) * 12, Math.sin(a) * 12, omen.color, 6, 18, EntityType.SPELL_SHARD, 120);
+                }
+                boss.current.health = Math.max(1, boss.current.health - 2500);
+                break;
+
+            case 'thermodynamic_shatter':
+                audioSynth.playShatter();
+                boss.current.health = Math.max(1, boss.current.health - 4500);
+                shake.current = 50;
+                particlePool.spawn(PLAY_AREA_X + PLAY_AREA_WIDTH / 2, PLAY_AREA_Y + PLAY_AREA_HEIGHT / 2, '#FFFFFF', 80, 15);
+                break;
+        }
+    };
+    // --- END NEW CODE ---
 
     const handlePlayerDeath = () => {
         if (deathBombTimer.current > 0) return;
@@ -138,26 +208,21 @@ export const GameCanvas: React.FC<{
         shake.current = 30;
     };
 
-
     const finalizeDeath = () => {
-        // --- MODE OVERRIDE: INFINITE LIVES ---
         if (mode !== GameMode.ENDLESS) {
             stats.current.lives--;
         }
-        // -------------------------------------
-
         stats.current.power = Math.max(0, stats.current.power - 20);
         stats.current.bombs = 3;
         invuln.current = 180;
         particlePool.spawn(player.current.x, player.current.y, PALETTE.PLAYER_AURA, 50, 6);
-        bulletPool.clear(particlePool);
+        bulletPool.clear(particlePool, itemPool);
 
         for (let k = 0; k < 5; k++) itemPool.spawn(boss.current.x, boss.current.y, (Math.random() - 0.5) * 5, -5, PALETTE.ITEM_POWER, 8, 8, EntityType.ITEM_POWER);
 
         player.current.x = PLAY_AREA_X + PLAY_AREA_WIDTH / 2;
         player.current.y = PLAY_AREA_Y + PLAY_AREA_HEIGHT - 30;
 
-        // Game Over should only trigger if NOT in Endless
         if (stats.current.lives < 0 && mode !== GameMode.ENDLESS) {
             if (stats.current.score > stats.current.hiscore) {
                 localStorage.setItem('SHRINE98_HISCORE', stats.current.score.toString());
@@ -166,15 +231,12 @@ export const GameCanvas: React.FC<{
         }
     };
 
-
     const firePlayer = (isFocused: boolean) => {
         audioSynth.playShoot();
         const pwr = stats.current.power;
         const level = Math.floor(pwr / 32) + 1;
 
-
         bulletPool.spawn(player.current.x, player.current.y - 10, 0, -20, PALETTE.BULLET_PLAYER, 6, 16, EntityType.BULLET_PLAYER);
-
 
         if (level >= 2) {
             const spread = isFocused ? 2 : 5;
@@ -188,24 +250,25 @@ export const GameCanvas: React.FC<{
         }
     };
 
-
-    const update = (dt: number) => {
+    const update = () => {
         if (isPaused || !player.current.active) return;
         frames.current++;
 
-        // 1. UPLINK TO GLOBAL INPUT STATE
         const inputState = useInputStore.getState();
         let cmds = inputState.commands;
 
-        // --- GHOST NODE INTERCEPT ---
+        // Update available omen for Mobile HUD Button
+        const activeOmenForUi = getHighestUnlockedOmen(stats.current.power);
+        setAvailableOmen(activeOmenForUi);
+
         if (inputState.isGhostMode && inputState.ghostData.length > 0) {
             if (frames.current < inputState.ghostData.length) {
-                cmds = inputState.ghostData[frames.current]; // Playback
+                cmds = inputState.ghostData[frames.current];
             } else {
-                cmds = { UP: false, DOWN: false, LEFT: false, RIGHT: false, ACTION: false, BOMB: false, FOCUS: false }; // End of run
+                cmds = { UP: false, DOWN: false, LEFT: false, RIGHT: false, ACTION: false, BOMB: false, FOCUS: false, SPELL: false };
             }
         } else if (inputState.isRecording) {
-            inputState.recordFrame(cmds); // Record
+            inputState.recordFrame(cmds);
         }
 
         if (deathBombTimer.current > 0) {
@@ -218,39 +281,27 @@ export const GameCanvas: React.FC<{
             return;
         }
 
-
-        // Aether Overload bomb mapping / Game Over
-        if (mode === GameMode.AETHER_OVERLOAD) {
-            if ((stats.current.pressure || 0) >= 100) {
-                stats.current.pressure = 0;
-                handlePlayerDeath(); // Overload
-            } else if (cmds.BOMB && (stats.current.pressure || 0) > 0) {
-                stats.current.pressure = 0; // release
-                triggerBomb();
-                cmds.BOMB = false;
-            }
+        // --- START NEW CODE: NULL OMEN TRIGGER POLLING ---
+        if (cmds.SPELL) {
+            launchNullOmen();
+            useInputStore.getState().setCommand('SPELL', false);
         }
-
+        // --- END NEW CODE ---
 
         if (cmds.BOMB) triggerBomb();
 
-
         let spd = cmds.FOCUS ? PLAYER_FOCUS_SPEED : PLAYER_SPEED;
         if (mode === GameMode.AETHER_OVERLOAD) spd *= (1 + (stats.current.pressure || 0) / 100);
-
 
         if (cmds.UP) player.current.y -= spd;
         if (cmds.DOWN) player.current.y += spd;
         if (cmds.LEFT) player.current.x -= spd;
         if (cmds.RIGHT) player.current.x += spd;
 
-
         player.current.x = Math.max(PLAY_AREA_X + 5, Math.min(PLAY_AREA_X + PLAY_AREA_WIDTH - 5, player.current.x));
         player.current.y = Math.max(PLAY_AREA_Y + 5, Math.min(PLAY_AREA_Y + PLAY_AREA_HEIGHT - 5, player.current.y));
 
-
         const pocActive = player.current.y < POC_THRESHOLD_Y;
-
 
         if (mode === GameMode.AETHER_OVERLOAD) {
             const fireDelay = Math.max(1, Math.floor(4 - (stats.current.pressure || 0) / 25));
@@ -259,300 +310,198 @@ export const GameCanvas: React.FC<{
             if (cmds.ACTION && frames.current % 4 === 0) firePlayer(cmds.FOCUS);
         }
 
-        // --- ENEMY/BULLET LOGIC (UNCHANGED) ---
-        // --- ENDLESS BOSS LOGIC START ---
-        boss.current.timer++;
-        boss.current.rotation += 0.02;
-        boss.current.x = (PLAY_AREA_X + PLAY_AREA_WIDTH / 2) + Math.sin(boss.current.timer * 0.015) * 60;
-        boss.current.y = 100 + Math.cos(boss.current.timer * 0.02) * 20;
+        // --- UPDATE ACTIVE NULL OMEN DURATION & EFFECTS ---
+        if (activeSpell.current.timer > 0) {
+            activeSpell.current.timer--;
+            activeSpell.current.bannerSlide = Math.min(1, activeSpell.current.bannerSlide + 0.1);
 
-        if (boss.current.active) {
-            const t = boss.current.timer;
-            const phase = stats.current.bossPhase;
-
-            if (mode === GameMode.ENDLESS) {
-                if (boss.current.health <= 0) {
-                    stats.current.bossPhase++;
-                    boss.current.health = BOSS_MAX_HEALTH + (stats.current.bossPhase * 1000);
-                    boss.current.timer = 0;
-                    bulletPool.clear(particlePool);
-                    audioSynth.playExtend();
-                    shake.current = 15;
-                    boss.current.currentPattern = generateInfinitePattern(stats.current.bossPhase);
-                }
-
-                const p = boss.current.currentPattern || generateInfinitePattern(0);
-
-                switch (p.type) {
-                    case 'SPIRAL':
-                        if (t % 2 === 0) {
-                            const a = t * p.rotationSpeed;
-                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * p.speed, Math.sin(a) * p.speed, p.color);
-                        }
-                        break;
-                    case 'FAN':
-                        if (t % 30 === 0) {
-                            for (let i = 0; i < p.count; i++) {
-                                const a = (Math.PI * 2 / p.count) * i + (t * 0.01);
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * p.speed, Math.sin(a) * p.speed, p.color);
-                            }
-                        }
-                        break;
-                    case 'AIMED':
-                        if (t % 40 === 0) {
-                            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
-                            for (let i = -2; i <= 2; i++) {
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.15) * (p.speed + 1), Math.sin(aim + i * 0.15) * (p.speed + 1), p.color);
-                            }
-                        }
-                        break;
-                    case 'BURST':
-                        if (t % 60 === 0) {
-                            for (let j = 0; j < 3; j++) {
-                                const offset = j * 0.5;
-                                for (let i = 0; i < Math.floor(p.count / 2); i++) {
-                                    const a = (Math.PI * 2 / (p.count / 2)) * i + offset;
-                                    bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * p.speed, Math.sin(a) * p.speed, p.color);
+            const omen = activeSpell.current.omen;
+            if (omen) {
+                // Hollow Abyss: Pull enemy bullets towards center and vacuum them
+                if (omen.id === 'hollow_abyss' && frames.current % 3 === 0) {
+                    bulletPool.pool.forEach(b => {
+                        if (b.active && b.type === EntityType.BULLET_ENEMY) {
+                            const dx = boss.current.x - b.x;
+                            const dy = boss.current.y - b.y;
+                            const dist = Math.hypot(dx, dy);
+                            if (dist < 180) {
+                                b.x += (dx / dist) * 8;
+                                b.y += (dy / dist) * 8;
+                                if (dist < 25) {
+                                    b.active = false;
+                                    itemPool.spawn(b.x, b.y, 0, -2, PALETTE.ITEM_POINT, 8, 8, EntityType.ITEM_POINT);
                                 }
                             }
                         }
-                        break;
+                    });
                 }
             }
-            // --- ENDLESS BOSS LOGIC END ---
 
-            if (mode === GameMode.TELLURIC_RESONANCE) {
-                const spec = audioSynth.getSpectrum();
-                if (spec) {
-                    let lowAvg = 0, highAvg = 0;
-                    for (let i = 0; i < 5; i++) lowAvg += spec[i];
-                    for (let i = 100; i < 110; i++) highAvg += spec[i];
-                    lowAvg /= 5; highAvg /= 10;
-
-                    if (highAvg > 160 && t % 3 === 0) {
-                        const a = t * 0.1;
-                        bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 6, Math.sin(a) * 6, '#FF003C', 4, 16);
-                        bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a + Math.PI) * 6, Math.sin(a + Math.PI) * 6, '#E056FD', 4, 16);
-                    }
-                    if (lowAvg > 220 && t % 40 === 0) {
-                        for (let i = 0; i < 8; i++) {
-                            const a = (Math.PI * 2 / 8) * i;
-                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 2.5, Math.sin(a) * 2.5, '#00FF00', 14, 14);
-                        }
-                    }
-                }
-            } else {
-                // --- START NEW CODE: TEN ADDITIONAL BOSS PHASES & SCALING DIFFICULTY (15 PHASES TOTAL) ---
-                switch (phase) {
-                    case 0: // Phase 1/15: Sub-Zero Radial Expansion
-                        if (t % 20 === 0) {
-                            const count = 20;
-                            for (let i = 0; i < count; i++) {
-                                const a = (Math.PI * 2 / count) * i + t * 0.05;
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 3, Math.sin(a) * 3, PALETTE.BULLET_ENEMY, 8, 8);
-                            }
-                        }
-                        break;
-                    case 1: // Phase 2/15: Dual Helix Counter-Rotating Spirals
-                        if (t % 4 === 0) {
-                            const a = t * 0.2;
-                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 4, Math.sin(a) * 4, '#FF00FF', 8, 8);
-                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a + 2) * 4, Math.sin(a + 2) * 4, '#00FFFF', 8, 8);
-                        }
-                        break;
-                    case 2: // Phase 3/15: Aimed 5-Way Fan Barrage
-                        if (t % 50 === 0) {
-                            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
-                            for (let i = -2; i <= 2; i++) {
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.12) * 4.8, Math.sin(aim + i * 0.12) * 4.8, '#FF003C', 10, 10);
-                            }
-                        }
-                        break;
-                    case 3: // Phase 4/15: Star Nova Burst
-                        if (t % 45 === 0) {
-                            for (let i = 0; i < 8; i++) {
-                                const baseA = (Math.PI * 2 / 8) * i + t * 0.03;
-                                for (let j = 1; j <= 3; j++) {
-                                    bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(baseA) * (2.5 + j * 0.8), Math.sin(baseA) * (2.5 + j * 0.8), '#E056FD', 8, 8);
-                                }
-                            }
-                        }
-                        break;
-                    case 4: // Phase 5/15: Accelerating Double Spiral Cannon
-                        if (t % 3 === 0) {
-                            const a1 = t * 0.15;
-                            const a2 = -t * 0.15;
-                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a1) * 5.2, Math.sin(a1) * 5.2, '#39FF14', 6, 6);
-                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a2) * 5.2, Math.sin(a2) * 5.2, '#FFD700', 6, 6);
-                        }
-                        break;
-                    case 5: // Phase 6/15: Homing Seeker Swarm + Outer Curtain Ring
-                        if (t % 35 === 0) {
-                            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
-                            for (let i = -1; i <= 1; i++) {
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.25) * 5.5, Math.sin(aim + i * 0.25) * 5.5, '#FF003C', 8, 8);
-                            }
-                            for (let i = 0; i < 16; i++) {
-                                const a = (Math.PI * 2 / 16) * i;
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 2.8, Math.sin(a) * 2.8, '#00F3FF', 8, 8);
-                            }
-                        }
-                        break;
-                    case 6: // Phase 7/15: Intersecting Crossfire Grid Matrix
-                        if (t % 40 === 0) {
-                            for (let i = -3; i <= 3; i++) {
-                                const offsetX = i * 25;
-                                bulletPool.spawn(boss.current.x + offsetX, boss.current.y, 0, 4.5, '#E056FD', 8, 8);
-                                const a = (Math.PI / 4) + i * 0.15;
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 4.5, Math.sin(a) * 4.5, '#FF003C', 8, 8);
-                            }
-                        }
-                        break;
-                    case 7: // Phase 8/15: Dynamic Void Vortex Shockwave
-                        if (t % 12 === 0) {
-                            const a = t * 0.25;
-                            const spd = 3.5 + Math.sin(t * 0.05) * 1.5;
-                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * spd, Math.sin(a) * spd, '#00FFFF', 8, 8);
-                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a + Math.PI) * spd, Math.sin(a + Math.PI) * spd, '#FF00FF', 8, 8);
-                        }
-                        break;
-                    case 8: // Phase 9/15: 12-Petal Blossom Cascade
-                        if (t % 30 === 0) {
-                            for (let i = 0; i < 12; i++) {
-                                const a = (Math.PI * 2 / 12) * i + Math.sin(t * 0.1) * 0.5;
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 5.8, Math.sin(a) * 5.8, '#FFD700', 8, 8);
-                            }
-                        }
-                        break;
-                    case 9: // Phase 10/15: High-Speed 3-Stream Needle Barrage
-                        if (t % 10 === 0) {
-                            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
-                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim) * 7.5, Math.sin(aim) * 7.5, '#FF003C', 4, 16);
-                            bulletPool.spawn(boss.current.x - 15, boss.current.y, Math.cos(aim - 0.1) * 7.2, Math.sin(aim - 0.1) * 7.2, '#E056FD', 4, 16);
-                            bulletPool.spawn(boss.current.x + 15, boss.current.y, Math.cos(aim + 0.1) * 7.2, Math.sin(aim + 0.1) * 7.2, '#E056FD', 4, 16);
-                        }
-                        break;
-                    case 10: // Phase 11/15: Chaos Explosion Nova
-                        if (t % 25 === 0) {
-                            for (let i = 0; i < 18; i++) {
-                                const a = Math.random() * Math.PI * 2;
-                                const spd = 3.5 + Math.random() * 4.5;
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * spd, Math.sin(a) * spd, '#39FF14', 8, 8);
-                            }
-                        }
-                        break;
-                    case 11: // Phase 12/15: Concentric Shockwave Rings + Sniper Aimed Shots
-                        if (t % 35 === 0) {
-                            for (let i = 0; i < 28; i++) {
-                                const a = (Math.PI * 2 / 28) * i;
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 4.2, Math.sin(a) * 4.2, '#00F3FF', 8, 8);
-                            }
-                            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
-                            for (let i = -1; i <= 1; i++) {
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.08) * 8.0, Math.sin(aim + i * 0.08) * 8.0, '#FF003C', 6, 12);
-                            }
-                        }
-                        break;
-                    case 12: // Phase 13/15: Quad Cross-Spiral Storm + Aimed Fan Bursts
-                        if (t % 2 === 0) {
-                            for (let k = 0; k < 4; k++) {
-                                const a = t * 0.15 + (Math.PI / 2) * k;
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 6.0, Math.sin(a) * 6.0, '#FF00FF', 6, 6);
-                            }
-                        }
-                        if (t % 40 === 0) {
-                            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
-                            for (let i = -2; i <= 2; i++) {
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.15) * 6.5, Math.sin(aim + i * 0.15) * 6.5, '#FFD700', 8, 8);
-                            }
-                        }
-                        break;
-                    case 13: // Phase 14/15: Imploding Singularity Sphere & Radial Eruption
-                        if (t % 50 === 0) {
-                            for (let i = 0; i < 36; i++) {
-                                const a = (Math.PI * 2 / 36) * i + (t * 0.02);
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 6.8, Math.sin(a) * 6.8, '#E056FD', 8, 8);
-                            }
-                        }
-                        break;
-                    case 14: default: // Phase 15/15: Absolute Void Overdrive (Climax Final Phase)
-                        if (t % 2 === 0) {
-                            const a1 = t * 0.2;
-                            const a2 = -t * 0.2;
-                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a1) * 6.5, Math.sin(a1) * 6.5, '#FF003C', 8, 8);
-                            bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a2) * 6.5, Math.sin(a2) * 6.5, '#00F3FF', 8, 8);
-                        }
-                        if (t % 25 === 0) {
-                            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
-                            for (let i = -5; i <= 5; i++) {
-                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.1) * 7.5, Math.sin(aim + i * 0.1) * 7.5, '#FFD700', 6, 14);
-                            }
-                        }
-                        break;
-                }
-                // --- END NEW CODE ---
+            if (activeSpell.current.timer <= 0) {
+                activeSpell.current.omen = null;
+                stats.current.activeOmen = null;
             }
         }
 
+        // --- BOSS PATTERN LOGIC ---
+        // If thermodynamic shatter is active, freeze boss patterns
+        if (!activeSpell.current.stasisActive || activeSpell.current.timer <= 0) {
+            boss.current.timer++;
+            boss.current.rotation += 0.02;
+            boss.current.x = (PLAY_AREA_X + PLAY_AREA_WIDTH / 2) + Math.sin(boss.current.timer * 0.015) * 60;
+            boss.current.y = 100 + Math.cos(boss.current.timer * 0.02) * 20;
 
+            if (boss.current.active) {
+                const t = boss.current.timer;
+                const phase = stats.current.bossPhase;
+
+                if (mode === GameMode.ENDLESS) {
+                    if (boss.current.health <= 0) {
+                        stats.current.bossPhase++;
+                        boss.current.health = BOSS_MAX_HEALTH + (stats.current.bossPhase * 1000);
+                        boss.current.timer = 0;
+                        bulletPool.clear(particlePool, itemPool);
+                        audioSynth.playExtend();
+                        shake.current = 15;
+                        boss.current.currentPattern = generateInfinitePattern(stats.current.bossPhase);
+                    }
+
+                    const p = boss.current.currentPattern || generateInfinitePattern(0);
+                    switch (p.type) {
+                        case 'SPIRAL':
+                            if (t % 2 === 0) {
+                                const a = t * p.rotationSpeed;
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * p.speed, Math.sin(a) * p.speed, p.color);
+                            }
+                            break;
+                        case 'FAN':
+                            if (t % 30 === 0) {
+                                for (let i = 0; i < p.count; i++) {
+                                    const a = (Math.PI * 2 / p.count) * i + (t * 0.01);
+                                    bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * p.speed, Math.sin(a) * p.speed, p.color);
+                                }
+                            }
+                            break;
+                        case 'AIMED':
+                            if (t % 40 === 0) {
+                                const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
+                                for (let i = -2; i <= 2; i++) {
+                                    bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.15) * (p.speed + 1), Math.sin(aim + i * 0.15) * (p.speed + 1), p.color);
+                                }
+                            }
+                            break;
+                        case 'BURST':
+                            if (t % 60 === 0) {
+                                for (let j = 0; j < 3; j++) {
+                                    const offset = j * 0.5;
+                                    for (let i = 0; i < Math.floor(p.count / 2); i++) {
+                                        const a = (Math.PI * 2 / (p.count / 2)) * i + offset;
+                                        bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * p.speed, Math.sin(a) * p.speed, p.color);
+                                    }
+                                }
+                            }
+                            break;
+                    }
+                } else {
+                    // Standard Boss Phase Pattern
+                    switch (phase) {
+                        case 0:
+                            if (t % 20 === 0) {
+                                for (let i = 0; i < 20; i++) {
+                                    const a = (Math.PI * 2 / 20) * i + t * 0.05;
+                                    bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 3, Math.sin(a) * 3, PALETTE.BULLET_ENEMY, 8, 8);
+                                }
+                            }
+                            break;
+                        case 1:
+                            if (t % 4 === 0) {
+                                const a = t * 0.2;
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a) * 4, Math.sin(a) * 4, '#FF00FF', 8, 8);
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a + 2) * 4, Math.sin(a + 2) * 4, '#00FFFF', 8, 8);
+                            }
+                            break;
+                        case 2:
+                            if (t % 50 === 0) {
+                                const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
+                                for (let i = -2; i <= 2; i++) {
+                                    bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(aim + i * 0.12) * 4.8, Math.sin(aim + i * 0.12) * 4.8, '#FF003C', 10, 10);
+                                }
+                            }
+                            break;
+                        default:
+                            if (t % 2 === 0) {
+                                const a1 = t * 0.2;
+                                bulletPool.spawn(boss.current.x, boss.current.y, Math.cos(a1) * 6.5, Math.sin(a1) * 6.5, '#FF003C', 8, 8);
+                            }
+                            break;
+                    }
+                }
+            }
+        }
+
+        // --- BULLET POOL TICK ---
         bulletPool.pool.forEach(b => {
             if (!b.active) return;
             b.x += b.dx; b.y += b.dy;
-            if (b.x < PLAY_AREA_X - 20 || b.x > PLAY_AREA_X + PLAY_AREA_WIDTH + 20 || b.y < PLAY_AREA_Y - 20 || b.y > PLAY_AREA_Y + PLAY_AREA_HEIGHT + 20) b.active = false;
-
+            if (b.x < PLAY_AREA_X - 20 || b.x > PLAY_AREA_X + PLAY_AREA_WIDTH + 20 || b.y < PLAY_AREA_Y - 20 || b.y > PLAY_AREA_Y + PLAY_AREA_HEIGHT + 20) {
+                b.active = false;
+            }
 
             if (bomb.current.active && b.type === EntityType.BULLET_ENEMY) {
                 const dx = b.x - player.current.x; const dy = b.y - player.current.y;
-                if (Math.sqrt(dx * dx + dy * dy) < bomb.current.radius) {
+                if (Math.hypot(dx, dy) < bomb.current.radius) {
                     b.active = false;
                     itemPool.spawn(b.x, b.y, 0, -2, PALETTE.ITEM_POINT, 8, 8, EntityType.ITEM_POINT);
                 }
             }
 
-
             if (b.type === EntityType.BULLET_ENEMY && player.current.active && invuln.current <= 0 && deathBombTimer.current <= 0) {
                 const dx = b.x - player.current.x; const dy = b.y - player.current.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+                const dist = Math.hypot(dx, dy);
 
-                if (mode === GameMode.PHASE_SHIFT && cmds.FOCUS) {
-                    if (dist < 80) {
-                        b.x -= dx * 0.05;
-                        b.y -= dy * 0.05;
-                        if (dist < PLAYER_HITBOX_RADIUS + 10) {
-                            b.active = false;
-                            audioSynth.playGraze();
-                            stats.current.bombs = Math.min(stats.current.bombs + 0.05, 5); // Energy Scavenging
-                        }
-                    }
-                } else if (dist < PLAYER_HITBOX_RADIUS + 3) {
+                if (dist < PLAYER_HITBOX_RADIUS + 3) {
                     b.active = false;
                     handlePlayerDeath();
                 } else if (dist < PLAYER_GRAZE_RADIUS && !b.grazed) {
                     b.grazed = true; stats.current.graze++; stats.current.score += 500;
-                    if (mode === GameMode.AETHER_OVERLOAD) stats.current.pressure = Math.min(100, (stats.current.pressure || 0) + 5);
                     audioSynth.playGraze();
                     particlePool.spawn(b.x, b.y, '#fff', 1, 1);
                 }
             }
         });
 
+        // --- SPELL SHARD PROJECTILES ---
+        spellPool.pool.forEach(s => {
+            if (!s.active) return;
+            const dx = boss.current.x - s.x;
+            const dy = boss.current.y - s.y;
+            const dist = Math.hypot(dx, dy);
+            s.x += (dx / dist) * 16;
+            s.y += (dy / dist) * 16;
+            if (dist < 30) {
+                s.active = false;
+                boss.current.health = Math.max(0, boss.current.health - 50);
+                stats.current.score += 5000;
+                particlePool.spawn(s.x, s.y, s.color, 4, 4);
+            }
+        });
 
+        // --- ITEM POOL TICK ---
         itemPool.pool.forEach(i => {
             if (!i.active) return;
             if (pocActive || i.homing) {
                 i.homing = true;
                 const dx = player.current.x - i.x;
                 const dy = player.current.y - i.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+                const dist = Math.hypot(dx, dy);
                 i.x += (dx / dist) * 12;
                 i.y += (dy / dist) * 12;
             } else {
                 i.y += 2.5;
             }
 
-
             const dx = i.x - player.current.x; const dy = i.y - player.current.y;
-            if (Math.sqrt(dx * dx + dy * dy) < PLAYER_COLLECT_RADIUS) {
+            if (Math.hypot(dx, dy) < PLAYER_COLLECT_RADIUS) {
                 i.active = false;
                 audioSynth.playItem();
                 if (i.type === EntityType.ITEM_POWER) {
@@ -561,9 +510,6 @@ export const GameCanvas: React.FC<{
                 } else if (i.type === EntityType.ITEM_LIFE) {
                     stats.current.lives++;
                     audioSynth.playExtend();
-                } else if (i.type === EntityType.ITEM_BIOCHAR) {
-                    stats.current.topography = Math.min(90, (stats.current.topography || 0) + 1);
-                    stats.current.score += 200;
                 } else {
                     stats.current.score += 5000;
                 }
@@ -571,41 +517,34 @@ export const GameCanvas: React.FC<{
             if (i.y > SCREEN_HEIGHT) i.active = false;
         });
 
-
+        // --- PLAYER BULLETS HIT DETECTION ---
         bulletPool.pool.forEach(b => {
             if (b.active && b.type === EntityType.BULLET_PLAYER) {
                 const dx = b.x - boss.current.x; const dy = b.y - boss.current.y;
-                if (Math.sqrt(dx * dx + dy * dy) < 30) {
-                    if (mode === GameMode.OBSIDIAN_SCRUBBER && Math.random() < 0.1) {
-                        itemPool.spawn(b.x, b.y, (Math.random() - 0.5) * 2, -2, '#E056FD', 6, 6, EntityType.ITEM_BIOCHAR);
-                    }
+                if (Math.hypot(dx, dy) < 30) {
                     b.active = false;
                     boss.current.health -= 10;
                     stats.current.score += 100;
                     particlePool.spawn(b.x, b.y, PALETTE.BOSS_AURA, 1, 2);
 
-
                     const hpPerPhase = BOSS_MAX_HEALTH / BOSS_TOTAL_PHASES;
                     const currentPhase = Math.floor((BOSS_MAX_HEALTH - boss.current.health) / hpPerPhase);
                     if (currentPhase > boss.current.phase && currentPhase < BOSS_TOTAL_PHASES) {
                         boss.current.phase = currentPhase;
-                        bulletPool.clear(particlePool);
+                        bulletPool.clear(particlePool, itemPool);
                         shake.current = 15;
-                        for (let k = 0; k < 15; k++) itemPool.spawn(boss.current.x, boss.current.y, (Math.random() - 0.5) * 3, -4, PALETTE.ITEM_POWER, 8, 8, EntityType.ITEM_POWER)
                     }
-
 
                     if (boss.current.health <= 0) {
                         boss.current.health = BOSS_MAX_HEALTH;
                         stats.current.score += 1000000;
-                        bulletPool.clear(particlePool);
+                        bulletPool.clear(particlePool, itemPool);
                         audioSynth.playExtend();
                         shake.current = 40;
                     }
                 }
             }
         });
-
 
         if (shake.current > 0) shake.current *= 0.9;
         if (invuln.current > 0) invuln.current--;
@@ -617,41 +556,25 @@ export const GameCanvas: React.FC<{
             stats.current.lives++; scoreExtends.current[0] = true; audioSynth.playExtend();
         }
 
-
         bgScroll.current = (bgScroll.current + 2) % 40;
-
-
         stats.current.bossHealth = boss.current.health;
         stats.current.bossPhase = boss.current.phase;
         if (frames.current % 10 === 0) setStats({ ...stats.current });
     };
 
-
     const draw = () => {
         const ctx = canvasRef.current?.getContext('2d');
         if (!ctx) return;
 
-
-        const cmds = useInputStore.getState().commands; // Read state for visual feedback
-
-
+        const cmds = useInputStore.getState().commands;
         const sx = (Math.random() - 0.5) * shake.current;
         const sy = (Math.random() - 0.5) * shake.current;
         ctx.save();
         ctx.translate(sx, sy);
 
-
         // BACKGROUND
         ctx.fillStyle = PALETTE.BG_VOID; ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-        ctx.fillStyle = "rgba(10, 0, 16, 0.8)"; ctx.fillRect(PLAY_AREA_X, PLAY_AREA_Y, PLAY_AREA_WIDTH, PLAY_AREA_HEIGHT);
-
-
-        if (mode === GameMode.OBSIDIAN_SCRUBBER) {
-            const topogHeight = (PLAY_AREA_HEIGHT * (stats.current.topography || 0)) / 100;
-            ctx.fillStyle = "rgba(224, 86, 253, 0.15)";
-            ctx.fillRect(PLAY_AREA_X, PLAY_AREA_Y + PLAY_AREA_HEIGHT - topogHeight, PLAY_AREA_WIDTH, topogHeight);
-        }
-
+        ctx.fillStyle = "rgba(10, 0, 16, 0.85)"; ctx.fillRect(PLAY_AREA_X, PLAY_AREA_Y, PLAY_AREA_WIDTH, PLAY_AREA_HEIGHT);
 
         ctx.strokeStyle = PALETTE.BG_GRID; ctx.lineWidth = 1;
         for (let y = bgScroll.current; y < SCREEN_HEIGHT; y += 40) {
@@ -659,34 +582,48 @@ export const GameCanvas: React.FC<{
         }
         ctx.strokeRect(PLAY_AREA_X, PLAY_AREA_Y, PLAY_AREA_WIDTH, PLAY_AREA_HEIGHT);
 
-
+        // POINT OF COLLECTION (PoC) LINE
         ctx.strokeStyle = "rgba(255, 255, 255, 0.2)"; ctx.setLineDash([5, 5]);
         ctx.beginPath(); ctx.moveTo(PLAY_AREA_X, POC_THRESHOLD_Y); ctx.lineTo(PLAY_AREA_X + PLAY_AREA_WIDTH, POC_THRESHOLD_Y); ctx.stroke();
         ctx.setLineDash([]);
 
+        // --- RENDER ACTIVE NULL OMEN VISUAL SPELLS ---
+        if (activeSpell.current.timer > 0 && activeSpell.current.omen) {
+            const omen = activeSpell.current.omen;
+            ctx.save();
 
-        if (cmds.FOCUS) {
-            ctx.fillStyle = '#FFFFFF';
-            ctx.beginPath();
-            ctx.arc(player.current.x, player.current.y, PLAYER_HITBOX_RADIUS, 0, Math.PI * 2);
-            ctx.fill();
+            if (omen.id === 'hollow_abyss') {
+                ctx.strokeStyle = omen.color;
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(boss.current.x, boss.current.y, 80 + Math.sin(frames.current * 0.1) * 20, 0, Math.PI * 2);
+                ctx.stroke();
+            } else if (omen.id === 'tearing_darkness') {
+                ctx.strokeStyle = omen.color;
+                ctx.lineWidth = 14;
+                ctx.shadowColor = omen.color;
+                ctx.shadowBlur = 20;
+                ctx.beginPath();
+                ctx.moveTo(player.current.x - 30, PLAY_AREA_Y + PLAY_AREA_HEIGHT);
+                ctx.lineTo(player.current.x - 30, PLAY_AREA_Y);
+                ctx.moveTo(player.current.x + 30, PLAY_AREA_Y + PLAY_AREA_HEIGHT);
+                ctx.lineTo(player.current.x + 30, PLAY_AREA_Y);
+                ctx.stroke();
+            } else if (omen.id === 'thermodynamic_shatter') {
+                ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.25})`;
+                ctx.fillRect(PLAY_AREA_X, PLAY_AREA_Y, PLAY_AREA_WIDTH, PLAY_AREA_HEIGHT);
+            }
 
-
-            ctx.strokeStyle = '#FF003C';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.arc(player.current.x, player.current.y, PLAYER_HITBOX_RADIUS + 1, 0, Math.PI * 2);
-            ctx.stroke();
-
-
-            ctx.strokeStyle = '#E056FD';
-            ctx.setLineDash([2, 2]);
-            ctx.beginPath();
-            ctx.arc(player.current.x, player.current.y, 15, frames.current * 0.05, frames.current * 0.05 + Math.PI);
-            ctx.stroke();
-            ctx.setLineDash([]);
+            ctx.restore();
         }
 
+        // FOCUS HITBOX
+        if (cmds.FOCUS) {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath(); ctx.arc(player.current.x, player.current.y, PLAYER_HITBOX_RADIUS, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#FF003C'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(player.current.x, player.current.y, PLAYER_HITBOX_RADIUS + 1, 0, Math.PI * 2); ctx.stroke();
+        }
 
         // BOSS
         if (boss.current.active) {
@@ -704,55 +641,37 @@ export const GameCanvas: React.FC<{
             ctx.restore();
         }
 
-
+        // HP BAR
         const hpWidth = PLAY_AREA_WIDTH;
-        ctx.fillStyle = "#330000"; ctx.fillRect(PLAY_AREA_X, PLAY_AREA_Y, hpWidth, 5);
-        // --- START NEW CODE: SCALING BOSS PHASE COLOR PALETTE ---
         const phaseMax = BOSS_MAX_HEALTH / BOSS_TOTAL_PHASES;
         const phaseCurrent = boss.current.health % phaseMax || phaseMax;
         const pct = phaseCurrent / phaseMax;
-        const phaseColors = ['#00FF00', '#39FF14', '#00F3FF', '#00FFFF', '#E056FD', '#FF00FF', '#FFD700', '#FFA500', '#FF4500', '#FF003C', '#FF0055', '#D100D1', '#9900FF', '#00E5FF', '#FFFFFF'];
-        ctx.fillStyle = phaseColors[boss.current.phase % phaseColors.length] || '#FF003C';
-        ctx.fillRect(PLAY_AREA_X, PLAY_AREA_Y, hpWidth * pct, 5);
-        // --- END NEW CODE ---
+        ctx.fillStyle = "#330000"; ctx.fillRect(PLAY_AREA_X, PLAY_AREA_Y, hpWidth, 5);
+        ctx.fillStyle = '#39FF14'; ctx.fillRect(PLAY_AREA_X, PLAY_AREA_Y, hpWidth * pct, 5);
 
-
+        // PLAYER VESSEL
         if (player.current.active && (invuln.current % 4 < 2)) {
             ctx.fillStyle = PALETTE.PLAYER_AURA;
-            if (frames.current % 4 === 0) {
-                ctx.globalAlpha = 0.3;
-                ctx.beginPath(); ctx.moveTo(player.current.x, player.current.y - 15); ctx.lineTo(player.current.x + 10, player.current.y + 10); ctx.lineTo(player.current.x - 10, player.current.y + 10); ctx.fill();
-                ctx.globalAlpha = 1.0;
-            }
             ctx.beginPath(); ctx.moveTo(player.current.x, player.current.y - 15); ctx.lineTo(player.current.x + 10, player.current.y + 10); ctx.lineTo(player.current.x - 10, player.current.y + 10); ctx.fill();
             ctx.fillStyle = PALETTE.PLAYER_CORE; ctx.fillRect(player.current.x - 3, player.current.y - 12, 6, 6);
-
-
-            if (cmds.FOCUS) {
-                const rot = frames.current * 0.1;
-                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
-                ctx.beginPath(); ctx.arc(player.current.x, player.current.y, PLAYER_HITBOX_RADIUS, 0, Math.PI * 2); ctx.stroke();
-
-
-                ctx.strokeStyle = PALETTE.PLAYER_AURA;
-                ctx.beginPath(); ctx.arc(player.current.x, player.current.y, 25, rot, rot + Math.PI); ctx.stroke();
-            }
         }
-
 
         if (bomb.current.active) {
             ctx.fillStyle = `rgba(255, 255, 255, ${bomb.current.timer / 120})`;
             ctx.beginPath(); ctx.arc(player.current.x, player.current.y, bomb.current.radius, 0, Math.PI * 2); ctx.fill();
         }
 
-
         particlePool.updateAndDraw(ctx);
+
+        // ITEMS
         itemPool.pool.forEach(i => {
             if (!i.active) return;
             ctx.fillStyle = i.color; ctx.fillRect(i.x - 4, i.y - 4, 8, 8);
             ctx.fillStyle = '#000'; ctx.font = "8px monospace";
-            ctx.fillText(i.type === EntityType.ITEM_POWER ? "P" : i.type === EntityType.ITEM_BIOCHAR ? "B" : "S", i.x - 2, i.y + 2);
+            ctx.fillText(i.type === EntityType.ITEM_POWER ? "P" : "S", i.x - 2, i.y + 2);
         });
+
+        // BULLETS
         bulletPool.pool.forEach(b => {
             if (!b.active) return;
             ctx.fillStyle = b.color;
@@ -760,20 +679,35 @@ export const GameCanvas: React.FC<{
             ctx.fillStyle = '#fff'; ctx.fillRect(b.x - 1, b.y - 1, 2, 2);
         });
 
+        // SPELL SHARDS
+        spellPool.pool.forEach(s => {
+            if (!s.active) return;
+            ctx.fillStyle = s.color;
+            ctx.beginPath(); ctx.arc(s.x, s.y, 4, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // --- RENDER SPELL CARD TOUHOU-STYLE BANNER CUT-IN ---
+        if (activeSpell.current.timer > 0 && activeSpell.current.omen) {
+            const omen = activeSpell.current.omen;
+            const bannerX = PLAY_AREA_X + PLAY_AREA_WIDTH - (activeSpell.current.bannerSlide * 340);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.strokeStyle = omen.color;
+            ctx.lineWidth = 2;
+            ctx.fillRect(bannerX, PLAY_AREA_Y + 40, 320, 48);
+            ctx.strokeRect(bannerX, PLAY_AREA_Y + 40, 320, 48);
+
+            ctx.fillStyle = omen.color;
+            ctx.font = "10px monospace";
+            ctx.fillText(`// NULL OMEN DEPLOYED`, bannerX + 12, PLAY_AREA_Y + 56);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = "bold 13px monospace";
+            ctx.fillText(`${omen.sign} [${omen.name}]`, bannerX + 12, PLAY_AREA_Y + 74);
+        }
 
         ctx.restore();
 
-
-        // UI
-        // UI (Lives Indicator)
+        // RIGHT SIDEBAR HUD
         const uiX = PLAY_AREA_X + PLAY_AREA_WIDTH + 20;
-
-        // If Endless, show infinite symbol, otherwise show hearts
-        const livesDisplay = mode === GameMode.ENDLESS ? "∞" : "♥".repeat(Math.max(0, stats.current.lives));
-        ctx.fillText(`LIVES: ${livesDisplay}`, uiX, 190);
-
-
-
         ctx.font = "24px monospace"; ctx.fillStyle = PALETTE.TEXT_PRIMARY; ctx.fillText("SHRINE-98", uiX, 40);
         ctx.font = "18px monospace"; ctx.fillStyle = "#fff";
         ctx.fillText(`SCORE:`, uiX, 80);
@@ -782,70 +716,71 @@ export const GameCanvas: React.FC<{
         ctx.fillText(`${stats.current.hiscore.toString().padStart(9, '0')}`, uiX, 150);
         ctx.fillText(`LIVES: ${"♥".repeat(Math.max(0, stats.current.lives))}`, uiX, 190);
         ctx.fillText(`BOMBS: ${"★".repeat(Math.max(0, stats.current.bombs))}`, uiX, 220);
+
+        // POWER POINT GAUGE WITH MILESTONES
         ctx.fillText(`POWER: ${stats.current.power}/128`, uiX, 260);
-        ctx.fillStyle = "#333"; ctx.fillRect(uiX, 270, 100, 8);
+        ctx.fillStyle = "#222"; ctx.fillRect(uiX, 270, 100, 8);
         ctx.fillStyle = PALETTE.ITEM_POWER; ctx.fillRect(uiX, 270, (stats.current.power / 128) * 100, 8);
-        ctx.fillStyle = "#fff";
+
+        // Milestone notches (32, 64, 96, 128)
+        ctx.fillStyle = '#FFD700';
+        [32, 64, 96, 128].forEach(m => {
+            ctx.fillRect(uiX + (m / 128) * 100 - 1, 268, 2, 12);
+        });
+
+        ctx.font = "14px monospace"; ctx.fillStyle = "#fff";
         ctx.fillText(`GRAZE: ${stats.current.graze}`, uiX, 310);
-
-        // --- START NEW CODE: BOSS PHASE UI HUD DISPLAY ---
         ctx.fillStyle = "#E056FD";
-        ctx.fillText(`PHASE: ${boss.current.phase + 1}/${BOSS_TOTAL_PHASES}`, uiX, 340);
-        // --- END NEW CODE ---
+        ctx.fillText(`PHASE: ${boss.current.phase + 1}/${BOSS_TOTAL_PHASES}`, uiX, 335);
 
-        if (mode === GameMode.AETHER_OVERLOAD) {
-            ctx.fillStyle = '#FF003C';
-            ctx.fillText(`PRESSURE: ${Math.floor(stats.current.pressure || 0)}%`, uiX, 370);
-        } else if (mode === GameMode.OBSIDIAN_SCRUBBER) {
-            ctx.fillStyle = '#E056FD';
-            ctx.fillText(`TOPOGRAPHY: ${stats.current.topography}%`, uiX, 370);
-        }
-
-
-        if (deathBombTimer.current > 0) {
-            ctx.fillStyle = "#FF0000"; ctx.fillText("!! DEATH !!", uiX, 350);
-        }
-
-        if (useInputStore.getState().isGhostMode) {
-            ctx.fillStyle = '#FF003C';
-            ctx.fillText("GHOST_NODE_ACTIVE", uiX, 380);
-        } else if (useInputStore.getState().isRecording) {
-            ctx.fillStyle = '#FF003C';
-            ctx.fillText("REC_GHOST_DATA", uiX, 380);
+        // SPELL CARD STATUS DISPLAY
+        const nextOmen = getHighestUnlockedOmen(stats.current.power);
+        if (nextOmen) {
+            ctx.fillStyle = '#FFD700';
+            ctx.font = "bold 11px monospace";
+            ctx.fillText(`[P] OMEN READY:`, uiX, 370);
+            ctx.fillStyle = nextOmen.color;
+            ctx.font = "10px monospace";
+            ctx.fillText(`${nextOmen.name}`, uiX, 388);
+        } else {
+            ctx.fillStyle = '#666';
+            ctx.font = "10px monospace";
+            ctx.fillText(`NEXT OMEN: 32 PWR`, uiX, 370);
         }
     };
 
-
-    useGameLoop((dt) => { update(dt); draw(); }, !isPaused);
-
-
-    const canvasClassNames = `w-full h-full object-contain ${mode === GameMode.AETHER_OVERLOAD && (stats.current.pressure || 0) > 80 ? 'chromatic-aberration-pulse'
-        : mode === GameMode.TELLURIC_RESONANCE ? 'low-latency-grid shadow-[0_0_50px_rgba(255,0,60,0.5)]'
-            : 'shadow-[0_0_30px_rgba(224,86,253,0.3)]'
-        }`;
-
+    useGameLoop(() => { update(); draw(); }, !isPaused);
 
     return (
-        <div className="relative w-full h-full flex justify-center items-center">
+        <div className="relative w-full h-full flex justify-center items-center font-mono">
             {bomb.current.active && (
                 <div className="absolute inset-0 luminescent-discharge pointer-events-none" />
             )}
             <canvas ref={canvasRef} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}
-                className={canvasClassNames}
+                className="w-full h-full object-contain shadow-[0_0_30px_rgba(224,86,253,0.3)]"
             />
 
-
-            {/* MOBILE HARDWARE OVERRIDE */}
+            {/* MOBILE HARDWARE CONTROLS & DYNAMIC SPELL CARD BUTTON */}
             {isMobile && (
                 <>
-                    {/* Left Haptic Node */}
                     <div className="absolute bottom-12 left-12 z-50">
                         <VirtualJoystick size={150} stickSize={60} />
                     </div>
 
+                    <div className="absolute bottom-16 right-16 flex flex-col gap-4 z-50">
+                        {/* --- START NEW CODE: MOBILE NULL OMEN POPUP BUTTON --- */}
+                        {availableOmen && (
+                            <button
+                                className="w-full h-14 rounded-lg bg-black/90 border-2 border-[#FFD700] text-[#FFD700] font-black flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,215,0,0.6)] animate-pulse active:scale-95 touch-none select-none"
+                                onTouchStart={(e) => { e.preventDefault(); launchNullOmen(); }}
+                                onClick={(e) => { e.preventDefault(); launchNullOmen(); }}
+                            >
+                                <Sparkles size={18} />
+                                <span className="text-[10px] tracking-wider">{availableOmen.name.toUpperCase()}</span>
+                            </button>
+                        )}
+                        {/* --- END NEW CODE --- */}
 
-                    {/* Right Logic Nodes */}
-                    <div className="absolute bottom-16 right-16 flex flex-col gap-6 z-50">
                         <div className="flex gap-4">
                             <button
                                 className="w-16 h-16 rounded-full bg-[#E056FD]/30 border-2 border-[#E056FD] active:bg-[#E056FD] text-white font-bold flex flex-col items-center justify-center select-none touch-none"
@@ -865,11 +800,11 @@ export const GameCanvas: React.FC<{
                             </button>
                         </div>
                         <button
-                            className="w-full h-20 rounded-full bg-white/10 border-2 border-white active:bg-white active:text-black text-white font-bold flex flex-col items-center justify-center select-none touch-none"
+                            className="w-full h-16 rounded-full bg-white/10 border-2 border-white active:bg-white active:text-black text-white font-bold flex flex-col items-center justify-center select-none touch-none"
                             onTouchStart={(e) => { e.preventDefault(); useInputStore.getState().setCommand('ACTION', true); }}
                             onTouchEnd={(e) => { e.preventDefault(); useInputStore.getState().setCommand('ACTION', false); }}
                         >
-                            <Crosshair size={24} className="mb-1" />
+                            <Crosshair size={22} className="mb-1" />
                             <span className="text-[10px] tracking-widest">FIRE</span>
                         </button>
                     </div>

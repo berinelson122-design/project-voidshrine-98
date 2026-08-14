@@ -1,14 +1,8 @@
 import { useEffect } from 'react';
-import { useInputStore } from '../store/useInputStore';
+import { useInputStore, CommandNode } from '../store/useInputStore';
 
-
-/**
-* Universal Input Hook
-* Maps keyboard events to the global CommandState.
-*/
 export const useUniversalInput = () => {
   const setCommand = useInputStore((state) => state.setCommand);
-
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent, isDown: boolean) => {
@@ -31,13 +25,11 @@ export const useUniversalInput = () => {
           setCommand('RIGHT', isDown);
           break;
 
-
         // Modifiers
         case 'ShiftLeft':
         case 'ShiftRight':
           setCommand('FOCUS', isDown);
           break;
-
 
         // Action Buttons
         case 'KeyZ':
@@ -48,9 +40,15 @@ export const useUniversalInput = () => {
         case 'KeyB':
           setCommand('BOMB', isDown);
           break;
+
+        // --- START NEW CODE: NULL OMEN SPELL CARD KEYBOARD TRIGGER ---
+        case 'KeyP':
+        case 'KeyC':
+          setCommand('SPELL', isDown);
+          break;
+        // --- END NEW CODE ---
       }
     };
-
 
     window.addEventListener('keydown', (e) => handleKey(e, true));
     window.addEventListener('keyup', (e) => handleKey(e, false));
@@ -61,7 +59,7 @@ export const useUniversalInput = () => {
     };
   }, [setCommand]);
 
-  // --- START NEW CODE: CONSOLE GAMEPAD CONTROLLER SUPPORT ---
+  // Console Controller Polling Loop
   useEffect(() => {
     let animId: number;
     const pollGamepad = () => {
@@ -84,6 +82,11 @@ export const useUniversalInput = () => {
         const btnBomb = gp.buttons[1]?.pressed || gp.buttons[6]?.pressed;
         const btnFocus = gp.buttons[2]?.pressed || gp.buttons[5]?.pressed;
 
+        // --- START NEW CODE: CONSOLE NULL OMEN TRIGGER (Button Y / Triangle / L1) ---
+        const btnSpell = gp.buttons[3]?.pressed || gp.buttons[4]?.pressed;
+        if (btnSpell !== undefined) setCommand('SPELL', Boolean(btnSpell));
+        // --- END NEW CODE ---
+
         if (btnAction !== undefined) setCommand('ACTION', Boolean(btnAction));
         if (btnBomb !== undefined) setCommand('BOMB', Boolean(btnBomb));
         if (btnFocus !== undefined) setCommand('FOCUS', Boolean(btnFocus));
@@ -94,8 +97,6 @@ export const useUniversalInput = () => {
     pollGamepad();
     return () => cancelAnimationFrame(animId);
   }, [setCommand]);
-  // --- END NEW CODE ---
-
 
   return { setCommand };
 };

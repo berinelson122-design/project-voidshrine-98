@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type CommandNode = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'ACTION' | 'BOMB' | 'FOCUS';
+export type CommandNode = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'ACTION' | 'BOMB' | 'FOCUS' | 'SPELL';
 export type InputCommands = Record<CommandNode, boolean>;
 
 interface InputState {
@@ -19,7 +19,16 @@ interface InputState {
     clearRecording: () => void;
 }
 
-const emptyCommands: InputCommands = { UP: false, DOWN: false, LEFT: false, RIGHT: false, ACTION: false, BOMB: false, FOCUS: false };
+const emptyCommands: InputCommands = {
+    UP: false,
+    DOWN: false,
+    LEFT: false,
+    RIGHT: false,
+    ACTION: false,
+    BOMB: false,
+    FOCUS: false,
+    SPELL: false,
+};
 
 export const useInputStore = create<InputState>((set) => ({
     commands: { ...emptyCommands },
@@ -30,11 +39,14 @@ export const useInputStore = create<InputState>((set) => ({
     ghostData: [],
 
     setDevice: (deviceType) => set({ deviceType }),
-    setCommand: (cmd, active) => set((state) => ({ commands: { ...state.commands, [cmd]: active } })),
+    setCommand: (cmd, active) =>
+        set((state) => ({ commands: { ...state.commands, [cmd]: active } })),
 
     // GHOST ACTIONS
-    setGhostMode: (active, data = []) => set({ isGhostMode: active, ghostData: data, deviceType: active ? 'GHOST' : 'PC' }),
+    setGhostMode: (active, data = []) =>
+        set({ isGhostMode: active, ghostData: data, deviceType: active ? 'GHOST' : 'PC' }),
     setRecording: (active) => set({ isRecording: active }),
-    recordFrame: (cmds) => set((state) => ({ ghostData: [...state.ghostData, { ...cmds }] })),
-    clearRecording: () => set({ ghostData: [] })
+    recordFrame: (cmds) =>
+        set((state) => ({ ghostData: [...state.ghostData, { ...cmds }] })),
+    clearRecording: () => set({ ghostData: [] }),
 }));

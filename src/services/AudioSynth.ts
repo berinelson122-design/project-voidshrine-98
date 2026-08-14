@@ -7,24 +7,22 @@ export class AudioSynth {
 
   init() {
     if (this.ctx) return;
-    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     this.ctx = new Ctx();
 
     this.analyser = this.ctx.createAnalyser();
-    this.analyser.fftSize = 512; // Higher resolution for beat detection
-    this.analyser.smoothingTimeConstant = 0.8; // Smooths out erratic spikes
+    this.analyser.fftSize = 512;
+    this.analyser.smoothingTimeConstant = 0.8;
 
     this.gainNode = this.ctx.createGain();
     this.gainNode.gain.value = 0.3;
 
-    // Route: Analyser -> Gain -> Destination
     this.analyser.connect(this.gainNode);
     this.gainNode.connect(this.ctx.destination);
 
     this.dataArray = new Uint8Array(this.analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
   }
 
-  // Mandatory to bypass browser autoplay restrictions
   async resumeContext() {
     if (this.ctx && this.ctx.state === 'suspended') {
       await this.ctx.resume();
@@ -35,10 +33,8 @@ export class AudioSynth {
     if (!this.ctx || !this.analyser || this.isConnected) return;
     try {
       const track = this.ctx.createMediaElementSource(audioElement);
-      // Route: Media Source -> Analyser
       track.connect(this.analyser);
       this.isConnected = true;
-      console.log("--> [AUDIO_UPLINK]: MP3 STREAM CONNECTED TO FFT ANALYSER");
     } catch (e) {
       console.warn("--> [AUDIO_WARNING]: Node already connected.", e);
     }
@@ -72,6 +68,33 @@ export class AudioSynth {
   playHit() { this.playTone(150, 'sawtooth', 0.4, 10); }
   playBomb() { this.playTone(500, 'sine', 0.1, 800); }
   playItem() { this.playTone(1500, 'sine', 0.1, 2000); }
+
+  // --- START NEW CODE: NULL OMEN PROCEDURAL AUDIO SYNTHESIS ---
+  playSpellCard() {
+    if (!this.ctx || !this.gainNode) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+
+    // Chime sweep + Bass burst
+    this.playTone(440, 'sine', 0.6, 1760);
+    setTimeout(() => this.playTone(880, 'triangle', 0.4, 3520), 80);
+    setTimeout(() => this.playTone(120, 'sawtooth', 0.8, 40), 120);
+  }
+
+  playLaser() {
+    this.playTone(1400, 'sawtooth', 0.25, 200);
+  }
+
+  playShatter() {
+    if (!this.ctx || !this.gainNode) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+
+    for (let i = 0; i < 4; i++) {
+      setTimeout(() => {
+        this.playTone(2000 + Math.random() * 2000, 'square', 0.15, 300);
+      }, i * 40);
+    }
+  }
+  // --- END NEW CODE ---
 }
 
 export const audioSynth = new AudioSynth();
