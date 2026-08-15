@@ -108,7 +108,7 @@ export const App: React.FC = () => {
                         <div className="bg-black border border-[#E056FD] p-10 flex flex-col items-center gap-6 w-[400px]">
                             <div className="text-center">
                                 <h1 className="text-6xl font-black tracking-tighter text-white drop-shadow-[0_0_15px_#E056FD]">SHRINE-98</h1>
-                                <p className="text-[10px] text-[#E056FD] tracking-[0.4em] uppercase mt-2">Sovereignty Protocol // v3.6</p>
+                                <p className="text-[10px] text-[#E056FD] tracking-[0.4em] uppercase mt-2">Sovereignty Protocol // v4.0</p>
                             </div>
 
                             <ModeSelector selectedMode={gameMode} onSelect={setGameMode} />
