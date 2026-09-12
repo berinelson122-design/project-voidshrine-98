@@ -1,10 +1,10 @@
 export enum GameMode {
-  NORMAL,
-  TELLURIC_RESONANCE,
-  ENDLESS,
-  AETHER_OVERLOAD,
-  OBSIDIAN_SCRUBBER,
-  PHASE_SHIFT,
+  NORMAL = 'NORMAL',
+  TELLURIC_RESONANCE = 'TELLURIC_RESONANCE',
+  AETHER_OVERLOAD = 'AETHER_OVERLOAD',
+  OBSIDIAN_SCRUBBER = 'OBSIDIAN_SCRUBBER',
+  PHASE_SHIFT = 'PHASE_SHIFT',
+  ENDLESS = 'ENDLESS'
 }
 
 export enum EntityType {
@@ -39,17 +39,6 @@ export interface Entity {
   maxLife?: number;
 }
 
-export interface InputState {
-  up: boolean;
-  down: boolean;
-  left: boolean;
-  right: boolean;
-  focus: boolean;
-  shoot: boolean;
-  bomb: boolean;
-  spell: boolean;
-}
-
 export interface GameStats {
   score: number;
   lives: number;
@@ -74,7 +63,6 @@ export interface PatternConfig {
   type: 'FAN' | 'SPIRAL' | 'AIMED' | 'BURST';
 }
 
-// --- NULL OMEN SPELL CARD SYSTEM ---
 export interface NullOmenDefinition {
   id: string;
   name: string;
@@ -83,8 +71,19 @@ export interface NullOmenDefinition {
   powerCost: number;
   color: string;
   secondaryColor: string;
-  duration: number; // frames
+  duration: number;
   description: string;
+}
+
+export interface RunRecord {
+  id: string;
+  timestamp: string;
+  score: number;
+  mode: GameMode;
+  bossPhase: number;
+  graze: number;
+  maxPower: number;
+  status: 'PURGED' | 'VICTORY' | 'ABORTED';
 }
 
 export const NULL_OMENS: NullOmenDefinition[] = [
@@ -97,7 +96,7 @@ export const NULL_OMENS: NullOmenDefinition[] = [
     color: '#E056FD',
     secondaryColor: '#FFFFFF',
     duration: 180,
-    description: 'Deploys a gravitational singularity that consumes hostile projectiles and converts them to points.'
+    description: 'Deploys a gravitational singularity that consumes hostile projectiles.'
   },
   {
     id: 'tearing_darkness',
@@ -108,7 +107,7 @@ export const NULL_OMENS: NullOmenDefinition[] = [
     color: '#FF003C',
     secondaryColor: '#FF0055',
     duration: 200,
-    description: 'Fires twin cross-axial laser beams that pierce through all entity layers and disintegrate incoming vectors.'
+    description: 'Fires twin cross-axial laser beams that pierce through all entity vectors.'
   },
   {
     id: 'byte_basher',
@@ -119,7 +118,7 @@ export const NULL_OMENS: NullOmenDefinition[] = [
     color: '#00F3FF',
     secondaryColor: '#39FF14',
     duration: 220,
-    description: 'Releases a swarm of 32 high-velocity homing digital needles targeting the Archon core.'
+    description: 'Releases a swarm of 32 high-velocity homing digital needles.'
   },
   {
     id: 'thermodynamic_shatter',
@@ -130,6 +129,6 @@ export const NULL_OMENS: NullOmenDefinition[] = [
     color: '#FFFFFF',
     secondaryColor: '#FFD700',
     duration: 240,
-    description: 'Executes absolute screen-freeze stasis, neutralizing all enemy bullets and shattering the boss core.'
+    description: 'Executes absolute screen-freeze stasis, shattering the Archon core.'
   }
 ];

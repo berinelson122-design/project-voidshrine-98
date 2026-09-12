@@ -10,19 +10,54 @@ export const VictoryScreen: React.FC<{ score: number, onRestart: () => void }> =
   const [submitted, setSubmitted] = useState(false);
 
   const fetchBoard = async () => {
-    const { data } = await supabase
-      .from('leaderboard')
-      .select('name, score')
-      .order('score', { ascending: false })
-      .limit(10);
-    if (data) setBoard(data);
+    try {
+      const { data, error } = await supabase
+        .from('leaderboard')
+        .select('name, score')
+        .order('score', { ascending: false })
+        .limit(10);
+      if (!error && data && data.length > 0) {
+        setBoard(data);
+        return;
+      }
+    } catch {
+      // offline fallback
+    }
+
+    try {
+      const local = JSON.parse(localStorage.getItem('SHRINE98_SCORES') || '[]');
+      if (local.length > 0) {
+        setBoard(local);
+        return;
+      }
+    } catch {
+      // ignore
+    }
+
+    setBoard([
+      { name: 'VOI', score: 150000 },
+      { name: 'ARC', score: 100000 },
+      { name: 'SYS', score: 50000 },
+    ]);
   };
 
   useEffect(() => { fetchBoard(); }, []);
 
   const handleSubmit = async () => {
     if (handle.length !== 3) return;
-    await syncScore(handle, score);
+    try {
+      await syncScore(handle, score);
+    } catch {
+      // ignore
+    }
+    try {
+      const local = JSON.parse(localStorage.getItem('SHRINE98_SCORES') || '[]');
+      local.push({ name: handle.toUpperCase(), score });
+      local.sort((a: { score: number }, b: { score: number }) => b.score - a.score);
+      localStorage.setItem('SHRINE98_SCORES', JSON.stringify(local.slice(0, 10)));
+    } catch {
+      // ignore
+    }
     setSubmitted(true);
     fetchBoard();
   };
