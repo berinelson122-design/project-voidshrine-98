@@ -5,7 +5,7 @@ import { GameCanvas } from './components/GameCanvas';
 import { DialogueOverlay } from './components/DialogueOverlay';
 import { VictoryScreen } from './components/VictoryScreen';
 import { DuelLink } from './components/DuelLink';
-import { Upload, Volume2, Power, Ghost, Save, Play, Gamepad2, Trophy, Music } from 'lucide-react';
+import { Upload, Volume2, Power, Ghost, Save, Play, Gamepad2, Trophy, Music, Network } from 'lucide-react';
 import { useUniversalInput } from './hooks/useUniversalInput';
 import { ModeSelector } from './components/ui/ModeSelector';
 import { ControlSettings } from './components/ui/ControlSettings';
@@ -27,6 +27,7 @@ export const App: React.FC = () => {
   const [isVictory, setIsVictory] = useState(false);
   const [showControlsModal, setShowControlsModal] = useState(false);
   const [showScoreboardModal, setShowScoreboardModal] = useState(false);
+  const [showDuelLink, setShowDuelLink] = useState(false);
 
   const [customAudio, setCustomAudio] = useState<string | null>(null);
   const [audioFileName, setAudioFileName] = useState<string | null>(null);
@@ -41,6 +42,16 @@ export const App: React.FC = () => {
       audioSynth.playExtend();
     }
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'c' && !isPlaying && !showStory && !isVictory) {
+        setShowDuelLink(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPlaying, showStory, isVictory]);
 
   useEffect(() => {
     if (customAudio && isPlaying) {
@@ -177,6 +188,12 @@ export const App: React.FC = () => {
                 >
                   <Gamepad2 size={12} /> [ DEVICE CONTROL MAPPING ]
                 </button>
+                <button
+                  onClick={() => setShowDuelLink(true)}
+                  className="w-full py-1.5 bg-transparent text-[#39FF14] hover:text-white font-bold text-[9px] uppercase hover:bg-[#39FF14]/10 border border-[#333] hover:border-[#39FF14] transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Network size={12} /> [ P2P DUEL NETWORK (PRESS C) ]
+                </button>
               </div>
             </div>
           </div>
@@ -201,9 +218,17 @@ export const App: React.FC = () => {
           onClose={() => setShowScoreboardModal(false)}
         />
 
-        {!isPlaying && !isVictory && !showStory && (
-          <div className="absolute top-4 left-4 z-50">
-            <DuelLink onPositionUpdate={handleRemoteCursor} />
+        {showDuelLink && !isPlaying && !isVictory && !showStory && (
+          <div className="fixed inset-0 z-[250] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="relative">
+              <DuelLink onPositionUpdate={handleRemoteCursor} />
+              <button
+                onClick={() => setShowDuelLink(false)}
+                className="w-full mt-3 py-2 bg-[#FF003C] text-black font-black text-xs hover:bg-white uppercase tracking-widest"
+              >
+                CLOSE NETWORK
+              </button>
+            </div>
           </div>
         )}
 

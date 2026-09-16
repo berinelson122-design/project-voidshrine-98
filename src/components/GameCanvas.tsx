@@ -12,6 +12,7 @@ import { useInputStore } from '../store/useInputStore';
 import { useGameStore } from '../store/gameStore';
 import { VirtualJoystick } from './ui/VirtualJoystick';
 import { generateInfinitePattern } from '../utils/PatternEngine';
+import { AudioVisualizer } from './AudioVisualizer';
 
 class EntityPool {
   pool: Entity[];
@@ -711,6 +712,7 @@ export const GameCanvas: React.FC<{
 
   return (
     <div className="relative w-full h-full flex justify-center items-center font-mono select-none">
+      <AudioVisualizer />
       {bomb.current.active && (
         <div className="absolute inset-0 luminescent-discharge pointer-events-none" />
       )}
