@@ -28,10 +28,10 @@ export const ControlSettings: React.FC = () => {
                         <Smartphone size={14} /> Mobile Haptic Engine (Touch Interface)
                     </div>
                     <div className="space-y-1 text-[10px]">
-                        <div className="flex justify-between gap-4"><span>Move:</span><span className="text-white">[VIRTUAL JOYSTICK]</span></div>
-                        <div className="flex justify-between gap-4"><span>Focus:</span><span className="text-white">[FOCUS NODE]</span></div>
-                        <div className="flex justify-between gap-4"><span>Fire:</span><span className="text-white">[FIRE NODE]</span></div>
-                        <div className="flex justify-between gap-4"><span>Bomb:</span><span className="text-white">[BOMB NODE]</span></div>
+                        <div className="flex justify-between gap-4"><span>Move:</span><span className="text-white">[TOUCH DRAG / ANYWHERE]</span></div>
+                        <div className="flex justify-between gap-4"><span>Focus:</span><span className="text-white">[FOCUS BUTTON]</span></div>
+                        <div className="flex justify-between gap-4"><span>Fire:</span><span className="text-white">[AUTO-FIRE ON DRAG]</span></div>
+                        <div className="flex justify-between gap-4"><span>Bomb:</span><span className="text-white">[BOMB BUTTON]</span></div>
                         <div className="flex justify-between gap-4 text-[#FFD700]"><span>Null Omen:</span><span className="text-white font-bold">[OMEN BUTTON] (Pops up at 32+ Power)</span></div>
                     </div>
                 </div>

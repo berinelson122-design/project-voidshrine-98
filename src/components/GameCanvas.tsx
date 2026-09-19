@@ -6,13 +6,11 @@ import {
   PLAYER_HITBOX_RADIUS, PLAYER_GRAZE_RADIUS, PLAYER_COLLECT_RADIUS, BOSS_MAX_HEALTH, BOSS_TOTAL_PHASES, POC_THRESHOLD_Y, DEATHBOMB_WINDOW, SCORE_EXTEND_1
 } from '../constants';
 import { Entity, EntityType, GameStats, GameMode, NULL_OMENS, NullOmenDefinition } from '../types';
-import { audioSynth } from '../services/AudioSynth';
+import { audioSynth, AudioRhythmData } from '../services/AudioSynth';
 import { Zap, Target, Crosshair, Sparkles } from 'lucide-react';
 import { useInputStore } from '../store/useInputStore';
 import { useGameStore } from '../store/gameStore';
-import { VirtualJoystick } from './ui/VirtualJoystick';
 import { generateInfinitePattern } from '../utils/PatternEngine';
-import { AudioVisualizer } from './AudioVisualizer';
 
 class EntityPool {
   pool: Entity[];
@@ -102,6 +100,20 @@ export const GameCanvas: React.FC<{
   const stats = useRef<GameStats>({ score: 0, lives: 3, bombs: 3, power: 0, graze: 0, bossHealth: BOSS_MAX_HEALTH, bossPhase: 0, fps: 60, hiscore: 0, pressure: 0, topography: 0, activeOmen: null });
   const frames = useRef(0);
 
+  // --- START NEW CODE: TELLURIC RESONANCE RHYTHM TRACKER REF ---
+  const rhythmData = useRef<AudioRhythmData>({
+    bass: 0,
+    mid: 0,
+    treble: 0,
+    energy: 0,
+    isBeat: false,
+    isSnare: false,
+    beatIntensity: 0,
+    rawSpectrum: null,
+    isExternalTrack: false,
+  });
+  // --- END NEW CODE: TELLURIC RESONANCE RHYTHM TRACKER REF ---
+
   const activeSpell = useRef<{
     omen: NullOmenDefinition | null;
     timer: number;
@@ -128,6 +140,82 @@ export const GameCanvas: React.FC<{
       window.removeEventListener('touchstart', initAudio);
     };
   }, []);
+
+  // --- START NEW CODE: DIRECT TOUCH DRAG / ANYWHERE MOVEMENT ENGINE ---
+  const touchDragRef = useRef<{
+    activeId: number | null;
+    lastX: number;
+    lastY: number;
+    isActive: boolean;
+  }>({
+    activeId: null,
+    lastX: 0,
+    lastY: 0,
+    isActive: false,
+  });
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (touchDragRef.current.activeId === null && e.changedTouches.length > 0) {
+      const touch = e.changedTouches[0];
+      touchDragRef.current.activeId = touch.identifier;
+      touchDragRef.current.lastX = touch.clientX;
+      touchDragRef.current.lastY = touch.clientY;
+      touchDragRef.current.isActive = true;
+
+      // Auto-fire while dragging on touchscreen
+      useInputStore.getState().setCommand('ACTION', true);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (touchDragRef.current.activeId === null) return;
+
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      if (touch.identifier === touchDragRef.current.activeId) {
+        const dx = touch.clientX - touchDragRef.current.lastX;
+        const dy = touch.clientY - touchDragRef.current.lastY;
+        touchDragRef.current.lastX = touch.clientX;
+        touchDragRef.current.lastY = touch.clientY;
+
+        if (canvasRef.current) {
+          const rect = canvasRef.current.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            const canvasAspect = SCREEN_WIDTH / SCREEN_HEIGHT;
+            const containerAspect = rect.width / rect.height;
+            let scale = 1;
+            if (containerAspect > canvasAspect) {
+              scale = SCREEN_HEIGHT / rect.height;
+            } else {
+              scale = SCREEN_WIDTH / rect.width;
+            }
+
+            const isFocused = useInputStore.getState().commands.FOCUS;
+            const speedFactor = isFocused ? (PLAYER_FOCUS_SPEED / PLAYER_SPEED) : 1.0;
+            const gameDx = dx * scale * speedFactor;
+            const gameDy = dy * scale * speedFactor;
+
+            player.current.x = Math.max(PLAY_AREA_X + 5, Math.min(PLAY_AREA_X + PLAY_AREA_WIDTH - 5, player.current.x + gameDx));
+            player.current.y = Math.max(PLAY_AREA_Y + 5, Math.min(PLAY_AREA_Y + PLAY_AREA_HEIGHT - 5, player.current.y + gameDy));
+          }
+        }
+        break;
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (touchDragRef.current.activeId === null) return;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === touchDragRef.current.activeId) {
+        touchDragRef.current.activeId = null;
+        touchDragRef.current.isActive = false;
+        useInputStore.getState().setCommand('ACTION', false);
+        break;
+      }
+    }
+  };
+  // --- END NEW CODE: DIRECT TOUCH DRAG ENGINE ---
 
   const getHighestUnlockedOmen = (pwr: number): NullOmenDefinition | null => {
     const eligible = NULL_OMENS.filter(o => pwr >= o.requiredPower);
@@ -253,6 +341,10 @@ export const GameCanvas: React.FC<{
   const update = () => {
     if (isPaused || !player.current.active) return;
     frames.current++;
+
+    // --- START NEW CODE: REAL-TIME AUDIO SPECTRUM & RHYTHM SAMPLING ---
+    rhythmData.current = audioSynth.getRhythmData();
+    // --- END NEW CODE: REAL-TIME AUDIO SPECTRUM & RHYTHM SAMPLING ---
 
     const inputState = useInputStore.getState();
     let cmds = inputState.commands;
@@ -383,6 +475,114 @@ export const GameCanvas: React.FC<{
               }
               break;
           }
+        } else if (mode === GameMode.TELLURIC_RESONANCE) {
+          // --- START NEW CODE: TELLURIC RESONANCE RHYTHM & BEAT BULLET ENGINE ---
+          const rhythm = rhythmData.current;
+
+          // 1. BEAT / BASS KICK TRANSIENT: Expands a high-density resonant shockwave ring
+          if (rhythm.isBeat) {
+            const count = Math.min(36, Math.max(16, 16 + Math.floor(rhythm.bass * 20)));
+            const baseAngle = (frames.current * 0.05) % (Math.PI * 2);
+            const speed = 2.8 + rhythm.beatIntensity * 3.4;
+            const isHeavyDrop = rhythm.beatIntensity > 0.75 || rhythm.energy > 0.8;
+
+            for (let i = 0; i < count; i++) {
+              const a = baseAngle + (Math.PI * 2 / count) * i;
+              const color = isHeavyDrop
+                ? (i % 2 === 0 ? '#FF003C' : '#00F3FF')
+                : (i % 2 === 0 ? '#E056FD' : '#FF003C');
+              bulletPool.spawn(
+                boss.current.x,
+                boss.current.y,
+                Math.cos(a) * speed,
+                Math.sin(a) * speed,
+                color,
+                8,
+                8
+              );
+            }
+
+            // Rhythm-reactive screen punch & particles
+            shake.current = Math.max(shake.current, 2 + rhythm.beatIntensity * 5);
+            particlePool.spawn(boss.current.x, boss.current.y, '#E056FD', 14, 5);
+          }
+
+          // 2. SNARE / MID TRANSIENT: Fires targeted sonic chords / needle spreads towards player
+          if (rhythm.isSnare) {
+            const aim = Math.atan2(player.current.y - boss.current.y, player.current.x - boss.current.x);
+            const speed = 4.2 + rhythm.mid * 2.8;
+            const spreadOffsets = [-0.3, -0.15, 0, 0.15, 0.3];
+
+            for (const offset of spreadOffsets) {
+              const a = aim + offset;
+              bulletPool.spawn(
+                boss.current.x - 24,
+                boss.current.y,
+                Math.cos(a) * speed,
+                Math.sin(a) * speed,
+                '#E056FD',
+                6,
+                14
+              );
+              bulletPool.spawn(
+                boss.current.x + 24,
+                boss.current.y,
+                Math.cos(a) * speed,
+                Math.sin(a) * speed,
+                '#FFFFFF',
+                6,
+                14
+              );
+            }
+          }
+
+          // 3. HI-HAT & TREBLE SYNTH GROOVE: Dancing sinusoidal oscilloscope wave
+          const fireInterval = rhythm.treble > 0.6 ? 2 : (rhythm.treble > 0.3 ? 3 : 4);
+          if (t % fireInterval === 0) {
+            const waveOffset = Math.sin(t * 0.15) * (0.3 + rhythm.treble * 0.8);
+            const speed = 2.6 + rhythm.treble * 3.2;
+            const angleLeft = (Math.PI * 0.5) + waveOffset;
+            const angleRight = (Math.PI * 0.5) - waveOffset;
+
+            bulletPool.spawn(
+              boss.current.x,
+              boss.current.y,
+              Math.cos(angleLeft) * speed,
+              Math.sin(angleLeft) * speed,
+              '#00F3FF',
+              6,
+              6
+            );
+            bulletPool.spawn(
+              boss.current.x,
+              boss.current.y,
+              Math.cos(angleRight) * speed,
+              Math.sin(angleRight) * speed,
+              '#FFD700',
+              6,
+              6
+            );
+          }
+
+          // 4. HIGH ENERGY DROP / CHORUS CLIMAX: 24-way harmonic mandala bloom
+          if (rhythm.energy > 0.72 && t % 28 === 0) {
+            const bloomCount = 24;
+            const spin = t * 0.08;
+            for (let i = 0; i < bloomCount; i++) {
+              const a = (Math.PI * 2 / bloomCount) * i + spin;
+              const spd = 3.8 + (i % 2 === 0 ? 1.4 : 0);
+              bulletPool.spawn(
+                boss.current.x,
+                boss.current.y,
+                Math.cos(a) * spd,
+                Math.sin(a) * spd,
+                i % 2 === 0 ? '#FF003C' : '#39FF14',
+                7,
+                7
+              );
+            }
+          }
+          // --- END NEW CODE: TELLURIC RESONANCE RHYTHM & BEAT BULLET ENGINE ---
         } else {
           switch (phase) {
             case 0:
@@ -596,8 +796,37 @@ export const GameCanvas: React.FC<{
     }
 
     if (boss.current.active) {
+      // --- START NEW CODE: TELLURIC ACOUSTIC RESONANCE RINGS ---
+      if (mode === GameMode.TELLURIC_RESONANCE) {
+        const rhythm = rhythmData.current;
+        ctx.save();
+        ctx.lineWidth = 1.5;
+
+        // Bass resonance field
+        ctx.strokeStyle = rhythm.isBeat ? '#FF003C' : 'rgba(255, 0, 60, 0.35)';
+        ctx.beginPath();
+        ctx.arc(boss.current.x, boss.current.y, 45 + rhythm.bass * 45, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Mid/Treble harmonic field
+        ctx.strokeStyle = rhythm.isSnare ? '#E056FD' : 'rgba(224, 86, 253, 0.25)';
+        ctx.beginPath();
+        ctx.arc(boss.current.x, boss.current.y, 65 + rhythm.mid * 55, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      // --- END NEW CODE: TELLURIC ACOUSTIC RESONANCE RINGS ---
+
       ctx.save();
       ctx.translate(boss.current.x, boss.current.y);
+
+      // --- START NEW CODE: TELLURIC PULSE SCALE ---
+      if (mode === GameMode.TELLURIC_RESONANCE) {
+        const rScale = 1.0 + (rhythmData.current.bass * 0.35);
+        ctx.scale(rScale, rScale);
+      }
+      // --- END NEW CODE: TELLURIC PULSE SCALE ---
+
       ctx.rotate(boss.current.rotation);
       ctx.strokeStyle = PALETTE.BOSS_AURA; ctx.lineWidth = 3;
       ctx.beginPath();
@@ -621,6 +850,17 @@ export const GameCanvas: React.FC<{
       ctx.fillStyle = PALETTE.PLAYER_AURA;
       ctx.beginPath(); ctx.moveTo(player.current.x, player.current.y - 15); ctx.lineTo(player.current.x + 10, player.current.y + 10); ctx.lineTo(player.current.x - 10, player.current.y + 10); ctx.fill();
       ctx.fillStyle = PALETTE.PLAYER_CORE; ctx.fillRect(player.current.x - 3, player.current.y - 12, 6, 6);
+
+      // Hitbox visualizer in FOCUS mode
+      if (cmds.FOCUS) {
+        ctx.strokeStyle = PALETTE.PLAYER_HITBOX;
+        ctx.lineWidth = 1.5;
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.arc(player.current.x, player.current.y, PLAYER_HITBOX_RADIUS + 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
     }
 
     if (bomb.current.active) {
@@ -711,8 +951,13 @@ export const GameCanvas: React.FC<{
   useGameLoop(() => { update(); draw(); }, !isPaused);
 
   return (
-    <div className="relative w-full h-full flex justify-center items-center font-mono select-none">
-      <AudioVisualizer />
+    <div 
+      className="relative w-full h-full flex justify-center items-center font-mono select-none touch-none"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+    >
       {bomb.current.active && (
         <div className="absolute inset-0 luminescent-discharge pointer-events-none" />
       )}
@@ -721,51 +966,69 @@ export const GameCanvas: React.FC<{
       />
 
       {isMobile && (
-        <>
-          <div className="absolute bottom-12 left-12 z-50">
-            <VirtualJoystick size={150} stickSize={60} />
-          </div>
-
-          <div className="absolute bottom-16 right-16 flex flex-col gap-4 z-50">
-            {availableOmen && (
-              <button
-                className="w-full h-14 rounded-lg bg-black/90 border-2 border-[#FFD700] text-[#FFD700] font-black flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,215,0,0.6)] animate-pulse active:scale-95 touch-none select-none"
-                onTouchStart={(e) => { e.preventDefault(); launchNullOmen(); }}
-                onClick={(e) => { e.preventDefault(); launchNullOmen(); }}
-              >
-                <Sparkles size={18} />
-                <span className="text-[10px] tracking-wider">{availableOmen.name.toUpperCase()}</span>
-              </button>
-            )}
-
-            <div className="flex gap-4">
-              <button
-                className="w-16 h-16 rounded-full bg-[#E056FD]/30 border-2 border-[#E056FD] active:bg-[#E056FD] text-white font-bold flex flex-col items-center justify-center select-none touch-none"
-                onTouchStart={(e) => { e.preventDefault(); useInputStore.getState().setCommand('FOCUS', true); }}
-                onTouchEnd={(e) => { e.preventDefault(); useInputStore.getState().setCommand('FOCUS', false); }}
-              >
-                <Target size={20} />
-                <span className="text-[8px]">FOCUS</span>
-              </button>
-              <button
-                className="w-16 h-16 rounded-full bg-[#FF003C]/30 border-2 border-[#FF003C] active:bg-[#FF003C] text-white font-bold flex flex-col items-center justify-center select-none touch-none"
-                onTouchStart={(e) => { e.preventDefault(); useInputStore.getState().setCommand('BOMB', true); }}
-                onTouchEnd={(e) => { e.preventDefault(); useInputStore.getState().setCommand('BOMB', false); }}
-              >
-                <Zap size={20} />
-                <span className="text-[8px]">BOMB</span>
-              </button>
-            </div>
+        <div 
+          className="absolute bottom-4 right-4 sm:bottom-8 sm:right-8 flex flex-col items-end gap-2.5 z-50 pointer-events-auto"
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+        >
+          {availableOmen && (
             <button
-              className="w-full h-16 rounded-full bg-white/10 border-2 border-white active:bg-white active:text-black text-white font-bold flex flex-col items-center justify-center select-none touch-none"
-              onTouchStart={(e) => { e.preventDefault(); useInputStore.getState().setCommand('ACTION', true); }}
-              onTouchEnd={(e) => { e.preventDefault(); useInputStore.getState().setCommand('ACTION', false); }}
+              className="px-4 py-2.5 rounded bg-black/90 border-2 border-[#FFD700] text-[#FFD700] font-black flex items-center justify-center gap-1.5 shadow-[0_0_20px_rgba(255,215,0,0.6)] animate-pulse active:scale-95 touch-none select-none"
+              onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); launchNullOmen(); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); launchNullOmen(); }}
             >
-              <Crosshair size={22} className="mb-1" />
-              <span className="text-[10px] tracking-widest">FIRE</span>
+              <Sparkles size={14} />
+              <span className="text-[9px] tracking-wider">{availableOmen.name.toUpperCase()}</span>
+            </button>
+          )}
+
+          <div className="flex items-center gap-2">
+            <button
+              className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full border-2 transition-all font-bold flex flex-col items-center justify-center select-none touch-none ${
+                useInputStore.getState().commands.FOCUS
+                  ? 'bg-[#E056FD] text-black border-white shadow-[0_0_15px_#E056FD]'
+                  : 'bg-[#E056FD]/30 border-[#E056FD] text-white active:bg-[#E056FD]'
+              }`}
+              onTouchStart={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const cur = useInputStore.getState().commands.FOCUS;
+                useInputStore.getState().setCommand('FOCUS', !cur);
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const cur = useInputStore.getState().commands.FOCUS;
+                useInputStore.getState().setCommand('FOCUS', !cur);
+              }}
+            >
+              <Target size={18} />
+              <span className="text-[7px]">FOCUS</span>
+            </button>
+
+            <button
+              className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-[#FF003C]/30 border-2 border-[#FF003C] active:bg-[#FF003C] text-white font-bold flex flex-col items-center justify-center select-none touch-none shadow-[0_0_15px_rgba(255,0,60,0.4)]"
+              onTouchStart={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                triggerBomb();
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                triggerBomb();
+              }}
+            >
+              <Zap size={18} />
+              <span className="text-[7px]">BOMB</span>
             </button>
           </div>
-        </>
+
+          <div className="text-[8px] text-[#E056FD] font-bold tracking-widest opacity-60 pointer-events-none uppercase mr-1">
+            [ DRAG FINGER TO MOVE ]
+          </div>
+        </div>
       )}
     </div>
   );

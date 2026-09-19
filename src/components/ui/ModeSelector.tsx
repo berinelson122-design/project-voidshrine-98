@@ -16,22 +16,21 @@ export const ModeSelector: React.FC<{
         { id: GameMode.ENDLESS, name: "ENDLESS RECURSION", desc: "Infinite Procedural Danmaku // Scaling Difficulty." }
     ];
 
-
     return (
-        <div className="w-full flex flex-col gap-2 mt-4 border-t border-[#333] pt-4">
-            <h3 className="text-[#E056FD] text-xs tracking-[0.2em] mb-2 text-center uppercase">Select Protocol</h3>
-            <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+        <div className="w-full flex flex-col gap-1 sm:gap-2 mt-1 sm:mt-3 border-t border-[#333] pt-2 sm:pt-3 shrink-0">
+            <h3 className="text-[#E056FD] text-[10px] sm:text-xs tracking-[0.2em] mb-0.5 sm:mb-1 text-center uppercase font-bold">Select Protocol</h3>
+            <div className="flex flex-col gap-1 sm:gap-2 max-h-28 sm:max-h-36 md:max-h-44 overflow-y-auto pr-1 sm:pr-2 custom-scrollbar">
                 {modes.map(m => (
                     <button
                         key={m.id}
                         onClick={() => onSelect(m.id)}
-                        className={`text-left p-2 border transition-all ${selectedMode === m.id
+                        className={`text-left p-1.5 sm:p-2 border transition-all ${selectedMode === m.id
                             ? 'border-[#FF003C] bg-[#FF003C]/20 text-[#fff] shadow-[0_0_10px_#FF003C]'
                             : 'border-[#333] hover:border-[#E056FD] hover:bg-[#E056FD]/10 text-[#aaa]'
                             }`}
                     >
-                        <div className="text-sm font-bold">{m.name}</div>
-                        <div className="text-[10px] opacity-70">{m.desc}</div>
+                        <div className="text-xs sm:text-sm font-bold truncate">{m.name}</div>
+                        <div className="text-[8px] sm:text-[10px] opacity-70 leading-tight truncate">{m.desc}</div>
                     </button>
                 ))}
             </div>
