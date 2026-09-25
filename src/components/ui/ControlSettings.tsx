@@ -19,6 +19,8 @@ export const ControlSettings: React.FC = () => {
                         <div className="flex justify-between gap-4"><span>Fire:</span><span className="text-white">[Z] / [SPACE]</span></div>
                         <div className="flex justify-between gap-4"><span>Bomb:</span><span className="text-white">[X] / [B]</span></div>
                         <div className="flex justify-between gap-4 text-[#FFD700]"><span>Null Omen:</span><span className="text-white font-bold">[P] / [C]</span></div>
+                        <div className="flex justify-between gap-4 text-[#E056FD]"><span>Binaural Focus:</span><span className="text-white">[F] / Presets & Sync</span></div>
+                        <div className="flex justify-between gap-4 text-[#00F3FF]"><span>Tap Tempo:</span><span className="text-white">[T] / Manual Fallback</span></div>
                     </div>
                 </div>
 
@@ -33,6 +35,8 @@ export const ControlSettings: React.FC = () => {
                         <div className="flex justify-between gap-4"><span>Fire:</span><span className="text-white">[AUTO-FIRE ON DRAG]</span></div>
                         <div className="flex justify-between gap-4"><span>Bomb:</span><span className="text-white">[BOMB BUTTON]</span></div>
                         <div className="flex justify-between gap-4 text-[#FFD700]"><span>Null Omen:</span><span className="text-white font-bold">[OMEN BUTTON] (Pops up at 32+ Power)</span></div>
+                        <div className="flex justify-between gap-4 text-[#E056FD]"><span>Binaural Audio:</span><span className="text-white">[FOCUS BEATS // MASTER SYNC]</span></div>
+                        <div className="flex justify-between gap-4 text-[#00F3FF]"><span>Tap Tempo:</span><span className="text-white">[TAP TEMPO TOUCH BUTTON]</span></div>
                     </div>
                 </div>
 

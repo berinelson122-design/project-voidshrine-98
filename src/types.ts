@@ -132,3 +132,76 @@ export const NULL_OMENS: NullOmenDefinition[] = [
     description: 'Executes absolute screen-freeze stasis, shattering the Archon core.'
   }
 ];
+
+// --- START NEW CODE: BINAURAL BEATS & FOCUS LEVELS PROTOCOL ---
+export type BrainwaveBand = 'DELTA' | 'THETA' | 'ALPHA' | 'BETA' | 'GAMMA';
+
+export interface FocusLevelPreset {
+  id: string;
+  focusLevel: string;
+  name: string;
+  subtitle: string;
+  carrierFreq: number;
+  beatFreq: number;
+  band: BrainwaveBand;
+  waveform: OscillatorType;
+  noiseLevel: number;
+  subHarmonics: boolean;
+  description: string;
+  clinicalTarget: string;
+}
+
+export interface BinauralState {
+  isPlaying: boolean;
+  activePresetId: string | null;
+  carrierFreq: number;
+  beatFreq: number;
+  waveform: OscillatorType;
+  noiseLevel: number;
+  subHarmonics: boolean;
+  volume: number;
+  isMuted: boolean;
+}
+
+export type RhythmSyncHarmonic = 'DELTA_1X' | 'THETA_2X' | 'THETA_3X' | 'ALPHA_5X' | 'BETA_7X' | 'GAMMA_20X';
+
+export interface DynamicRhythmSyncState {
+  enabled: boolean;
+  harmonic: RhythmSyncHarmonic;
+  detectedBpm: number;
+  calculatedBeatFreq: number;
+  isLocked: boolean;
+  isManualOverride?: boolean;
+  tapCount?: number;
+}
+
+export interface SavedFocusPreset {
+  id: string;
+  name: string;
+  carrierFreq: number;
+  beatFreq: number;
+  band: BrainwaveBand;
+  waveform: OscillatorType;
+  noiseLevel: number;
+  subHarmonics: boolean;
+  isDefault?: boolean;
+  timestamp: number;
+}
+
+// --- START NEW CODE: SMOOTH CROSSFADE & MASTER SYNC PROTOCOLS ---
+export interface CrossfadeConfig {
+  enabled: boolean;
+  durationMs: number;
+  intensityCurve: 'SMOOTH' | 'EXPONENTIAL' | 'LINEAR';
+}
+
+export interface MasterSyncState {
+  enabled: boolean;
+  baseCarrierFreq: number;
+  syncedCarrierFreq: number;
+  tempoRatio: number;
+  detectedBpm: number;
+  isLocked: boolean;
+}
+// --- END NEW CODE: SMOOTH CROSSFADE & MASTER SYNC PROTOCOLS ---
+// --- END NEW CODE: BINAURAL BEATS & FOCUS LEVELS PROTOCOL ---

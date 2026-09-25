@@ -5,11 +5,12 @@ import { GameCanvas } from './components/GameCanvas';
 import { DialogueOverlay } from './components/DialogueOverlay';
 import { VictoryScreen } from './components/VictoryScreen';
 import { DuelLink } from './components/DuelLink';
-import { Upload, Volume2, VolumeX, Power, Ghost, Save, Play, Gamepad2, Trophy, Music, Network, Tv } from 'lucide-react';
+import { Upload, Volume2, VolumeX, Power, Ghost, Save, Play, Gamepad2, Trophy, Music, Network, Tv, Headphones, SlidersHorizontal, Square, Radio, Sparkles } from 'lucide-react';
 import { useUniversalInput } from './hooks/useUniversalInput';
 import { ModeSelector } from './components/ui/ModeSelector';
 import { ControlSettings } from './components/ui/ControlSettings';
 import { ScoreboardModal } from './components/ui/ScoreboardModal';
+import { BinauralModal } from './components/ui/BinauralModal';
 import { audioSynth } from './services/AudioSynth';
 import { useGhostRun } from './hooks/useGhostRun';
 
@@ -49,6 +50,38 @@ export const App: React.FC = () => {
   const [isMuted, setIsMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // --- START NEW CODE: SECONDARY AUDIO & BINAURAL FOCUS STATE ---
+  const [binauralVolume, setBinauralVolume] = useState<number>(() => audioSynth.getBinauralVolume());
+  const [isBinauralMuted, setIsBinauralMuted] = useState<boolean>(() => audioSynth.getIsBinauralMuted());
+  const [showBinauralModal, setShowBinauralModal] = useState<boolean>(false);
+  const [isBinauralActive, setIsBinauralActive] = useState<boolean>(() => audioSynth.isBinauralActive());
+
+  const handleBinauralVolumeChange = (v: number) => {
+    setBinauralVolume(v);
+    audioSynth.setBinauralVolume(v);
+    if (isBinauralMuted) {
+      setIsBinauralMuted(false);
+      audioSynth.setBinauralMuted(false);
+    }
+  };
+
+  const handleToggleBinauralMute = () => {
+    const next = !isBinauralMuted;
+    setIsBinauralMuted(next);
+    audioSynth.setBinauralMuted(next);
+  };
+
+  const handleToggleBinauralTune = () => {
+    if (audioSynth.isBinauralActive()) {
+      audioSynth.stopBinaural();
+      setIsBinauralActive(false);
+    } else {
+      audioSynth.startBinaural();
+      setIsBinauralActive(true);
+    }
+  };
+  // --- END NEW CODE: SECONDARY AUDIO & BINAURAL FOCUS STATE ---
+
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -71,6 +104,9 @@ export const App: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === 'c' && !isPlaying && !showStory && !isVictory) {
         setShowDuelLink(prev => !prev);
+      }
+      if (e.key.toLowerCase() === 'f' && !showStory && !isVictory) {
+        setShowBinauralModal(prev => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -117,6 +153,23 @@ export const App: React.FC = () => {
 
         {isPlaying ? (
           <>
+            {/* --- START NEW CODE: IN-GAME BINAURAL FOCUS QUICK ACCESS --- */}
+            <div className="absolute top-6 left-6 z-[200] flex items-center gap-2">
+              <button
+                onClick={() => setShowBinauralModal(true)}
+                title="CONFIGURE BINAURAL FOCUS TUNES (PRESS F)"
+                className={`flex items-center gap-1.5 px-3 py-2 bg-black/70 border font-bold text-[9px] uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(0,0,0,0.8)] ${
+                  isBinauralActive
+                    ? 'border-[#39FF14] text-[#39FF14] hover:bg-[#39FF14] hover:text-black shadow-[0_0_15px_rgba(57,255,20,0.3)]'
+                    : 'border-[#E056FD] text-[#E056FD] hover:bg-[#E056FD] hover:text-black'
+                }`}
+              >
+                <Headphones size={12} className={isBinauralActive ? 'text-[#39FF14]' : 'text-[#E056FD]'} />
+                <span>[ FOCUS BEATS: {isBinauralActive ? 'ACTIVE' : 'STANDBY'} ]</span>
+              </button>
+            </div>
+            {/* --- END NEW CODE: IN-GAME BINAURAL FOCUS QUICK ACCESS --- */}
+
             <button
               onClick={handleReboot}
               className="absolute top-6 right-6 z-[200] flex items-center gap-2 px-4 py-2 bg-black/50 border border-[#FF003C] text-[#FF003C] hover:bg-[#FF003C] hover:text-black font-black text-[10px] uppercase tracking-widest transition-all"
@@ -178,38 +231,122 @@ export const App: React.FC = () => {
                   />
                 </label>
 
-                <div className="flex items-center gap-2 px-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextMuted = !isMuted;
-                      setIsMuted(nextMuted);
-                      audioSynth.setMuted(nextMuted);
-                    }}
-                    title={isMuted ? "UNMUTE ALL AUDIO" : "MUTE ALL AUDIO"}
-                    className={`p-1.5 border transition-all flex items-center justify-center shrink-0 ${
-                      isMuted
-                        ? 'border-[#FF003C] bg-[#FF003C]/20 text-[#FF003C] shadow-[0_0_10px_rgba(255,0,60,0.5)]'
-                        : 'border-[#333] bg-black text-[#E056FD] hover:border-[#E056FD] hover:text-white'
-                    }`}
-                  >
-                    {isMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
-                  </button>
-                  <input
-                    type="range" min="0" max="1" step="0.01" value={isMuted ? 0 : volume}
-                    disabled={isMuted}
-                    onChange={(e) => {
-                      const v = parseFloat(e.target.value);
-                      setVolume(v);
-                      audioSynth.setVolume(v);
-                      if (isMuted) setIsMuted(false);
-                    }}
-                    className={`flex-1 accent-[#E056FD] bg-[#333] h-1 appearance-none cursor-pointer ${isMuted ? 'opacity-30 cursor-not-allowed' : ''}`}
-                  />
-                  <span className={`text-[8px] sm:text-[9px] font-bold w-9 text-right font-mono ${isMuted ? 'text-[#FF003C]' : 'text-gray-400'}`}>
-                    {isMuted ? 'MUTE' : `${Math.round(volume * 100)}%`}
-                  </span>
+                {/* --- START NEW CODE: DUAL AUDIO VOLUME BUS (PRIMARY & SECONDARY BINAURAL) --- */}
+                <div className="space-y-2 bg-[#050505] p-2 border border-[#222]">
+                  {/* PRIMARY VOLUME: SFX & ARK TRACK */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[8px] sm:text-[9px] text-gray-400 font-bold uppercase">
+                      <span className="flex items-center gap-1">
+                        <Volume2 size={10} className="text-[#00F3FF]" />
+                        PRIMARY AUDIO // SFX & ARK
+                      </span>
+                      <span className={`font-mono ${isMuted ? 'text-[#FF003C]' : 'text-gray-300'}`}>
+                        {isMuted ? 'MUTE' : `${Math.round(volume * 100)}%`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextMuted = !isMuted;
+                          setIsMuted(nextMuted);
+                          audioSynth.setMuted(nextMuted);
+                        }}
+                        title={isMuted ? "UNMUTE PRIMARY AUDIO" : "MUTE PRIMARY AUDIO"}
+                        className={`p-1 border transition-all flex items-center justify-center shrink-0 ${
+                          isMuted
+                            ? 'border-[#FF003C] bg-[#FF003C]/20 text-[#FF003C]'
+                            : 'border-[#333] bg-black text-[#00F3FF] hover:border-[#00F3FF] hover:text-white'
+                        }`}
+                      >
+                        {isMuted ? <VolumeX size={11} /> : <Volume2 size={11} />}
+                      </button>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={isMuted ? 0 : volume}
+                        disabled={isMuted}
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value);
+                          setVolume(v);
+                          audioSynth.setVolume(v);
+                          if (isMuted) setIsMuted(false);
+                        }}
+                        className={`flex-1 accent-[#00F3FF] bg-[#222] h-1 appearance-none cursor-pointer ${
+                          isMuted ? 'opacity-30 cursor-not-allowed' : ''
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* SECONDARY VOLUME: BINAURAL BEATS & FOCUS LEVEL TUNES */}
+                  <div className="space-y-1 pt-1.5 border-t border-[#1a1a1a]">
+                    <div className="flex items-center justify-between text-[8px] sm:text-[9px] font-bold uppercase">
+                      <span className="text-[#E056FD] flex items-center gap-1">
+                        <Headphones size={10} className="text-[#E056FD]" />
+                        SECONDARY AUDIO // BINAURAL FOCUS
+                      </span>
+                      <span className={`font-mono ${isBinauralMuted ? 'text-[#FF003C]' : 'text-white'}`}>
+                        {isBinauralMuted ? 'MUTE' : `${Math.round(binauralVolume * 100)}%`}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleToggleBinauralMute}
+                        title={isBinauralMuted ? "UNMUTE BINAURAL AUDIO" : "MUTE BINAURAL AUDIO"}
+                        className={`p-1 border transition-all flex items-center justify-center shrink-0 ${
+                          isBinauralMuted
+                            ? 'border-[#FF003C] bg-[#FF003C]/20 text-[#FF003C]'
+                            : 'border-[#333] bg-black text-[#E056FD] hover:border-[#E056FD] hover:text-white'
+                        }`}
+                      >
+                        {isBinauralMuted ? <VolumeX size={11} /> : <Volume2 size={11} />}
+                      </button>
+
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={isBinauralMuted ? 0 : binauralVolume}
+                        disabled={isBinauralMuted}
+                        onChange={(e) => handleBinauralVolumeChange(parseFloat(e.target.value))}
+                        className={`flex-1 accent-[#E056FD] bg-[#222] h-1 appearance-none cursor-pointer ${
+                          isBinauralMuted ? 'opacity-30 cursor-not-allowed' : ''
+                        }`}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={handleToggleBinauralTune}
+                        title={isBinauralActive ? "STOP BINAURAL BEAT" : "START BINAURAL BEAT"}
+                        className={`px-1.5 py-0.5 border text-[8px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shrink-0 ${
+                          isBinauralActive
+                            ? 'border-[#FF003C] bg-[#FF003C]/20 text-[#FF003C] shadow-[0_0_8px_rgba(255,0,60,0.4)]'
+                            : 'border-[#39FF14] bg-[#39FF14]/10 text-[#39FF14] hover:bg-[#39FF14] hover:text-black'
+                        }`}
+                      >
+                        {isBinauralActive ? <Square size={8} className="fill-current" /> : <Play size={8} className="fill-current" />}
+                        <span>{isBinauralActive ? 'STOP' : 'TUNE'}</span>
+                      </button>
+                    </div>
+
+                    {/* FOCUS GENERATOR LAUNCH BUTTON */}
+                    <button
+                      type="button"
+                      onClick={() => setShowBinauralModal(true)}
+                      className="w-full mt-1 py-1.5 bg-[#E056FD]/10 border border-[#E056FD] hover:bg-[#E056FD] hover:text-black text-[#E056FD] font-bold text-[8px] sm:text-[9px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-[0_0_10px_rgba(224,86,253,0.15)]"
+                    >
+                      <SlidersHorizontal size={11} />
+                      <span>[ BINAURAL FOCUS GENERATOR & TUNES (F) ]</span>
+                    </button>
+                  </div>
                 </div>
+                {/* --- END NEW CODE: DUAL AUDIO VOLUME BUS (PRIMARY & SECONDARY BINAURAL) --- */}
               </div>
 
               {/* HARDWARE MAPPING & GHOST CONTROLS */}
@@ -303,6 +440,20 @@ export const App: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* --- START NEW CODE: BINAURAL FOCUS ENGINE & TUNES MODAL --- */}
+        <BinauralModal
+          isOpen={showBinauralModal}
+          onClose={() => {
+            setShowBinauralModal(false);
+            setIsBinauralActive(audioSynth.isBinauralActive());
+          }}
+          binauralVolume={binauralVolume}
+          onVolumeChange={handleBinauralVolumeChange}
+          isBinauralMuted={isBinauralMuted}
+          onMuteToggle={handleToggleBinauralMute}
+        />
+        {/* --- END NEW CODE: BINAURAL FOCUS ENGINE & TUNES MODAL --- */}
 
         <div className="fixed bottom-4 right-4 flex flex-col items-end opacity-40 pointer-events-none z-[200]">
           <span className="text-[10px] text-[#E056FD] font-bold tracking-tighter">ARCHITECT // VOID_WEAVER</span>
