@@ -1,5 +1,5 @@
 // --- START NEW CODE: BINAURAL PRESETS & BIOELECTRIC MATRIX PROTOCOL ---
-import { FocusLevelPreset, BrainwaveBand } from '../types';
+import { FocusLevelPreset, BrainwaveBand, PresetCategory, SavedFocusPreset, RhythmSyncHarmonic } from '../types';
 
 export const BRAINWAVE_BANDS: Record<BrainwaveBand, { min: number; max: number; label: string; color: string; desc: string }> = {
   DELTA: {
@@ -39,96 +39,68 @@ export const BRAINWAVE_BANDS: Record<BrainwaveBand, { min: number; max: number; 
   }
 };
 
-export const FOCUS_PRESETS: FocusLevelPreset[] = [
-  {
-    id: 'focus-10',
-    focusLevel: 'FOCUS 10',
-    name: 'Mind Awake, Body Asleep',
-    subtitle: 'Sensory Hyperexcitability Calming // 7.0 Hz Theta',
-    carrierFreq: 136.1, // Earth Om frequency
-    beatFreq: 7.0,
-    band: 'THETA',
-    waveform: 'sine',
-    noiseLevel: 0.12,
-    subHarmonics: true,
-    description: 'Somatic motor system reaches deep rest while executive consciousness remains razor sharp. Bridges the gap between nervous system agitation and calm mental presence.',
-    clinicalTarget: 'Dampens sympathetic fight-or-flight overdrive, calms autistic sensory overwhelm.'
+export const PRESET_CATEGORIES: Record<Exclude<PresetCategory, 'ALL'>, { label: string; desc: string; color: string; defaultCarrier: number; defaultBeat: number; band: BrainwaveBand; icon: string }> = {
+  'Concentration': {
+    label: 'CONCENTRATION',
+    desc: 'Sharpen executive throughput, task concentration, motor reflexes, and tactical focus.',
+    color: '#FFD700',
+    defaultCarrier: 144.0,
+    defaultBeat: 14.0,
+    band: 'BETA',
+    icon: 'Zap'
   },
-  {
-    id: 'focus-12',
-    focusLevel: 'FOCUS 12',
-    name: 'Expanded Awareness',
-    subtitle: 'Inter-Hemispheric Coherence // 10.0 Hz Alpha',
-    carrierFreq: 144.0,
-    beatFreq: 10.0,
+  'Deep Sleep': {
+    label: 'DEEP SLEEP',
+    desc: 'Slow Delta wave entrainment for parasympathetic vagus stimulation and sleep recovery.',
+    color: '#00F3FF',
+    defaultCarrier: 96.0,
+    defaultBeat: 1.8,
+    band: 'DELTA',
+    icon: 'Moon'
+  },
+  'Deep Theta': {
+    label: 'DEEP THETA',
+    desc: 'Deep meditative void states, timeless tranquility, and Schumann resonance grounding.',
+    color: '#E056FD',
+    defaultCarrier: 136.1,
+    defaultBeat: 5.5,
+    band: 'THETA',
+    icon: 'Sparkles'
+  },
+  'Meditation & Flow': {
+    label: 'MEDITATION & FLOW',
+    desc: 'Inter-hemispheric coherence, relaxed awareness, and sensory overload filtering.',
+    color: '#39FF14',
+    defaultCarrier: 432.0,
+    defaultBeat: 8.5,
     band: 'ALPHA',
+    icon: 'Waves'
+  }
+};
+
+export const FOCUS_PRESETS: FocusLevelPreset[] = [
+  // --- CONCENTRATION CATEGORY ---
+  {
+    id: 'focus-concentration-1',
+    focusLevel: 'CONCENTRATION I',
+    name: 'Executive Task Focus',
+    subtitle: 'High Throughput Concentration // 14.0 Hz Beta',
+    category: 'Concentration',
+    carrierFreq: 144.0,
+    beatFreq: 14.0,
+    band: 'BETA',
     waveform: 'sine',
     noiseLevel: 0.08,
     subHarmonics: true,
-    description: 'Consciousness expands beyond physical boundaries. Facilitates smooth cross-hemispheric communication and multi-sensory integration without sensory flooding.',
-    clinicalTarget: 'Enhances cognitive flexibility, eases rigid sensory filters, elevates spatial awareness.'
-  },
-  {
-    id: 'focus-15',
-    focusLevel: 'FOCUS 15',
-    name: 'State of No Time',
-    subtitle: 'Deep Theta Stillness // 4.5 Hz Theta',
-    carrierFreq: 108.0,
-    beatFreq: 4.5,
-    band: 'THETA',
-    waveform: 'sine',
-    noiseLevel: 0.15,
-    subHarmonics: true,
-    description: 'A stillness where time perception dissolves. Internal monologue slows into tranquil void-space, allowing complete bioelectric reset.',
-    clinicalTarget: 'Silences persistent ruminative loops, resets overstimulated auditory networks.'
-  },
-  {
-    id: 'focus-21',
-    focusLevel: 'FOCUS 21',
-    name: 'The Edge / The Bridge',
-    subtitle: 'Threshold Boundary State // 3.8 Hz Delta/Theta',
-    carrierFreq: 216.0,
-    beatFreq: 3.8,
-    band: 'DELTA',
-    waveform: 'sine',
-    noiseLevel: 0.10,
-    subHarmonics: true,
-    description: 'Operating at the doorway of physical and subtle fields. Subtle harmonic dissonance creates a portal sensation into high-dimensional calm.',
-    clinicalTarget: 'Neurological threshold navigation, deep neural tension release.'
-  },
-  {
-    id: 'focus-23',
-    focusLevel: 'FOCUS 23',
-    name: 'Somatic Re-alignment',
-    subtitle: 'Deep Vagal Grounding // 2.8 Hz Delta',
-    carrierFreq: 96.0,
-    beatFreq: 2.8,
-    band: 'DELTA',
-    waveform: 'sine',
-    noiseLevel: 0.14,
-    subHarmonics: true,
-    description: 'Deep resonant Delta pulse targeted at bioelectric recalibration. Stabilizes cardiac rhythm and somatic nervous tissue.',
-    clinicalTarget: 'Stimulates parasympathetic vagus nerve, counters physical burnout and sensory shutdown.'
-  },
-  {
-    id: 'focus-27',
-    focusLevel: 'FOCUS 27',
-    name: 'Bioelectric Sanctuary',
-    subtitle: 'Planetary Resonance // 7.83 Hz Schumann + 432 Hz',
-    carrierFreq: 432.0,
-    beatFreq: 7.83,
-    band: 'THETA',
-    waveform: 'sine',
-    noiseLevel: 0.08,
-    subHarmonics: true,
-    description: 'The healing reception center. Natural Verdi pitch tuned to the Earth ionospheric Schumann resonance, bathing neural pathways in restorative harmonics.',
-    clinicalTarget: 'Cellular bioelectric repair, soothing electromagnetic sensitivity and autistic burnout.'
+    description: 'Targeted Beta entrainment designed for sustained reading, coding, and high-density problem solving without sensory fatigue.',
+    clinicalTarget: 'Elevates dopaminergic focus, suppresses cognitive drift and mental fatigue.'
   },
   {
     id: 'focus-1',
     focusLevel: 'FOCUS 1',
     name: 'Tactical Precision Beta',
     subtitle: 'Reflex & Danmaku Evasion // 15.0 Hz Beta',
+    category: 'Concentration',
     carrierFreq: 220.0,
     beatFreq: 15.0,
     band: 'BETA',
@@ -143,6 +115,7 @@ export const FOCUS_PRESETS: FocusLevelPreset[] = [
     focusLevel: 'GAMMA 40',
     name: 'Microglial Coherence',
     subtitle: 'Whole-Brain Binding // 40.0 Hz Gamma',
+    category: 'Concentration',
     carrierFreq: 250.0,
     beatFreq: 40.0,
     band: 'GAMMA',
@@ -151,6 +124,132 @@ export const FOCUS_PRESETS: FocusLevelPreset[] = [
     subHarmonics: false,
     description: '40Hz bioelectric frequency recognized in cutting-edge neuroscience for microglial stimulation, neural clearance, and high-level sensory binding.',
     clinicalTarget: 'Promotes microglial cellular clearing, synchronizes cortical networks.'
+  },
+
+  // --- DEEP SLEEP CATEGORY ---
+  {
+    id: 'focus-deep-sleep-delta',
+    focusLevel: 'DEEP SLEEP I',
+    name: 'Autonomic Delta Restoration',
+    subtitle: 'Delta Stage-4 Sleep // 1.5 Hz Delta',
+    category: 'Deep Sleep',
+    carrierFreq: 90.0,
+    beatFreq: 1.5,
+    band: 'DELTA',
+    waveform: 'sine',
+    noiseLevel: 0.18,
+    subHarmonics: true,
+    description: 'Slow-wave Delta acoustic entrainment that calms muscle tension and guides the brain into restorative deep sleep stages.',
+    clinicalTarget: 'Stimulates human growth hormone release, drives deep parasympathetic somatic recovery.'
+  },
+  {
+    id: 'focus-23',
+    focusLevel: 'FOCUS 23',
+    name: 'Somatic Re-alignment',
+    subtitle: 'Deep Vagal Grounding // 2.8 Hz Delta',
+    category: 'Deep Sleep',
+    carrierFreq: 96.0,
+    beatFreq: 2.8,
+    band: 'DELTA',
+    waveform: 'sine',
+    noiseLevel: 0.14,
+    subHarmonics: true,
+    description: 'Deep resonant Delta pulse targeted at bioelectric recalibration. Stabilizes cardiac rhythm and somatic nervous tissue.',
+    clinicalTarget: 'Stimulates parasympathetic vagus nerve, counters physical burnout and sensory shutdown.'
+  },
+  {
+    id: 'focus-21',
+    focusLevel: 'FOCUS 21',
+    name: 'The Edge / Sleep Boundary',
+    subtitle: 'Threshold Boundary State // 3.8 Hz Delta/Theta',
+    category: 'Deep Sleep',
+    carrierFreq: 216.0,
+    beatFreq: 3.8,
+    band: 'DELTA',
+    waveform: 'sine',
+    noiseLevel: 0.10,
+    subHarmonics: true,
+    description: 'Operating at the doorway of physical wakefulness and deep sleep fields. Subtle harmonic resonance induces immediate physical let-go.',
+    clinicalTarget: 'Neurological threshold navigation, deep neural tension release.'
+  },
+
+  // --- DEEP THETA CATEGORY ---
+  {
+    id: 'focus-10',
+    focusLevel: 'FOCUS 10',
+    name: 'Mind Awake, Body Asleep',
+    subtitle: 'Sensory Hyperexcitability Calming // 7.0 Hz Theta',
+    category: 'Deep Theta',
+    carrierFreq: 136.1, // Earth Om frequency
+    beatFreq: 7.0,
+    band: 'THETA',
+    waveform: 'sine',
+    noiseLevel: 0.12,
+    subHarmonics: true,
+    description: 'Somatic motor system reaches deep rest while executive consciousness remains razor sharp. Bridges the gap between nervous system agitation and calm mental presence.',
+    clinicalTarget: 'Dampens sympathetic fight-or-flight overdrive, calms autistic sensory overwhelm.'
+  },
+  {
+    id: 'focus-15',
+    focusLevel: 'FOCUS 15',
+    name: 'State of No Time',
+    subtitle: 'Deep Theta Stillness // 4.5 Hz Theta',
+    category: 'Deep Theta',
+    carrierFreq: 108.0,
+    beatFreq: 4.5,
+    band: 'THETA',
+    waveform: 'sine',
+    noiseLevel: 0.15,
+    subHarmonics: true,
+    description: 'A stillness where time perception dissolves. Internal monologue slows into tranquil void-space, allowing complete bioelectric reset.',
+    clinicalTarget: 'Silences persistent ruminative loops, resets overstimulated auditory networks.'
+  },
+  {
+    id: 'focus-27',
+    focusLevel: 'FOCUS 27',
+    name: 'Bioelectric Sanctuary',
+    subtitle: 'Planetary Resonance // 7.83 Hz Schumann + 432 Hz',
+    category: 'Deep Theta',
+    carrierFreq: 432.0,
+    beatFreq: 7.83,
+    band: 'THETA',
+    waveform: 'sine',
+    noiseLevel: 0.08,
+    subHarmonics: true,
+    description: 'The healing reception center. Natural Verdi pitch tuned to the Earth ionospheric Schumann resonance, bathing neural pathways in restorative harmonics.',
+    clinicalTarget: 'Cellular bioelectric repair, soothing electromagnetic sensitivity and autistic burnout.'
+  },
+
+  // --- MEDITATION & FLOW CATEGORY ---
+  {
+    id: 'focus-12',
+    focusLevel: 'FOCUS 12',
+    name: 'Expanded Awareness',
+    subtitle: 'Inter-Hemispheric Coherence // 10.0 Hz Alpha',
+    category: 'Meditation & Flow',
+    carrierFreq: 144.0,
+    beatFreq: 10.0,
+    band: 'ALPHA',
+    waveform: 'sine',
+    noiseLevel: 0.08,
+    subHarmonics: true,
+    description: 'Consciousness expands beyond physical boundaries. Facilitates smooth cross-hemispheric communication and multi-sensory integration without sensory flooding.',
+    clinicalTarget: 'Enhances cognitive flexibility, eases rigid sensory filters, elevates spatial awareness.'
+  },
+  {
+    id: 'focus-flow-alpha',
+    focusLevel: 'ALPHA FLOW',
+    name: 'Solfeggio 528 Flow State',
+    subtitle: 'Tranquil Harmony // 8.5 Hz Alpha + 528 Hz',
+    category: 'Meditation & Flow',
+    carrierFreq: 528.0,
+    beatFreq: 8.5,
+    band: 'ALPHA',
+    waveform: 'sine',
+    noiseLevel: 0.07,
+    subHarmonics: true,
+    description: '528Hz Solfeggio bio-harmonic carrier layered with 8.5Hz Alpha pulsation for effortless creative expression and stress-free meditation.',
+    clinicalTarget: 'Fosters rapid parasympathetic ease, balances emotional tone and sensory filtering.'
   }
 ];
 
@@ -163,12 +262,12 @@ export function getBandForFrequency(freq: number): BrainwaveBand {
 }
 
 // --- START NEW CODE: SAVED FOCUS PRESETS & DYNAMIC RHYTHM SYNC PROTOCOL ---
-import { SavedFocusPreset, RhythmSyncHarmonic } from '../types';
 
 export const DEFAULT_SAVED_PRESETS: SavedFocusPreset[] = [
   {
     id: 'preset-deep-work',
     name: 'Deep Work',
+    category: 'Concentration',
     carrierFreq: 144.0,
     beatFreq: 10.0,
     band: 'ALPHA',
@@ -181,6 +280,7 @@ export const DEFAULT_SAVED_PRESETS: SavedFocusPreset[] = [
   {
     id: 'preset-meditation',
     name: 'Meditation',
+    category: 'Meditation & Flow',
     carrierFreq: 108.0,
     beatFreq: 4.5,
     band: 'THETA',
@@ -192,7 +292,8 @@ export const DEFAULT_SAVED_PRESETS: SavedFocusPreset[] = [
   },
   {
     id: 'preset-high-energy',
-    name: 'High-Energy',
+    name: 'High-Energy Focus',
+    category: 'Concentration',
     carrierFreq: 220.0,
     beatFreq: 16.0,
     band: 'BETA',
@@ -204,7 +305,8 @@ export const DEFAULT_SAVED_PRESETS: SavedFocusPreset[] = [
   },
   {
     id: 'preset-restorative-healing',
-    name: 'Restorative Sanctuary',
+    name: 'Deep Theta Sanctuary',
+    category: 'Deep Theta',
     carrierFreq: 432.0,
     beatFreq: 7.83,
     band: 'THETA',
@@ -216,12 +318,13 @@ export const DEFAULT_SAVED_PRESETS: SavedFocusPreset[] = [
   },
   {
     id: 'preset-somatic-reset',
-    name: 'Somatic Reset',
+    name: 'Deep Sleep Somatic Reset',
+    category: 'Deep Sleep',
     carrierFreq: 96.0,
-    beatFreq: 2.8,
+    beatFreq: 1.8,
     band: 'DELTA',
     waveform: 'sine',
-    noiseLevel: 0.14,
+    noiseLevel: 0.18,
     subHarmonics: true,
     isDefault: true,
     timestamp: 1700000000004,

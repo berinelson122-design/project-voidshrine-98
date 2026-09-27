@@ -1,9 +1,10 @@
 // --- START NEW CODE: BINAURAL BEATS, SMOOTH CROSSFADE, MASTER SYNC & FOCUS PRESETS UI ---
 import React, { useState, useEffect, useRef } from 'react';
-import { FocusLevelPreset, BrainwaveBand, SavedFocusPreset, RhythmSyncHarmonic } from '../../types';
+import { FocusLevelPreset, BrainwaveBand, SavedFocusPreset, RhythmSyncHarmonic, PresetCategory } from '../../types';
 import {
   FOCUS_PRESETS,
   BRAINWAVE_BANDS,
+  PRESET_CATEGORIES,
   RHYTHM_SYNC_HARMONICS,
   getBandForFrequency,
   getSavedFocusPresets,
@@ -39,7 +40,8 @@ import {
   RotateCcw,
   Plus,
   Minus,
-  MousePointerClick
+  MousePointerClick,
+  Moon
 } from 'lucide-react';
 
 interface BinauralModalProps {
@@ -63,6 +65,7 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>('focus-10');
   const [carrierFreq, setCarrierFreq] = useState<number>(136.1);
   const [beatFreq, setBeatFreq] = useState<number>(7.0);
+  const [intensity, setIntensity] = useState<number>(() => audioSynth.getIntensity());
   const [waveform, setWaveform] = useState<OscillatorType>('sine');
   const [noiseLevel, setNoiseLevel] = useState<number>(0.12);
   const [subHarmonics, setSubHarmonics] = useState<boolean>(true);
@@ -90,6 +93,7 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
   const [isCrossfading, setIsCrossfading] = useState<boolean>(false);
   const [savedPresets, setSavedPresets] = useState<SavedFocusPreset[]>(() => getSavedFocusPresets());
   const [newPresetName, setNewPresetName] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<PresetCategory>('ALL');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'PRESETS' | 'RHYTHM_SYNC' | 'MANUAL_TUNING'>('PRESETS');
   // --- END NEW CODE: SMOOTH CROSSFADE & SAVED PRESETS STATE ---
@@ -127,6 +131,7 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
         if (preset) {
           setCarrierFreq(preset.carrierFreq);
           setBeatFreq(preset.beatFreq);
+          setIntensity(preset.intensity ?? state.intensity ?? 0.70);
           setWaveform(preset.waveform);
           setNoiseLevel(preset.noiseLevel);
           setSubHarmonics(preset.subHarmonics);
@@ -135,6 +140,7 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
       } else {
         setCarrierFreq(state.carrierFreq);
         setBeatFreq(state.beatFreq);
+        setIntensity(state.intensity ?? 0.70);
         setWaveform(state.waveform);
         setNoiseLevel(state.noiseLevel);
         setSubHarmonics(state.subHarmonics);
@@ -257,7 +263,7 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
       }
       ctx.stroke();
 
-      // Draw Resulting Binaural Envelope (Modulation Beat Wave)
+      // Draw Resulting Binaural Envelope (Modulation Beat Wave with AM Intensity depth)
       ctx.strokeStyle = isCrossfading ? '#FFD700' : bandInfo.color;
       ctx.lineWidth = isCrossfading ? 3.0 : 2.5;
       ctx.shadowColor = isCrossfading ? '#FFD700' : bandInfo.color;
@@ -267,7 +273,8 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
         const normX = x / w;
         const beatEnvelope = Math.cos((normX * 4 + time * (beatFreq * 0.25)) * Math.PI);
         const carrierSignal = Math.sin((normX * 30 + time * 10) * Math.PI);
-        const crossfadeScale = isCrossfading ? (0.2 + 0.15 * Math.sin(time * 8)) : 0.38;
+        const amDepthMultiplier = 0.16 + intensity * 0.28;
+        const crossfadeScale = isCrossfading ? (0.2 + 0.15 * Math.sin(time * 8)) : amDepthMultiplier;
         const y = h / 2 + beatEnvelope * carrierSignal * (h * crossfadeScale);
         if (x === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
@@ -282,7 +289,7 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
       ctx.fillText(
         isCrossfading
           ? `[SMOOTH CROSSFADE ACTIVE // ADAPTING INTENSITY] ${beatFreq.toFixed(1)} Hz`
-          : `BEAT: ${beatFreq.toFixed(1)} Hz [${activeBand}] ${masterSyncEnabled ? '• [MASTER SYNC LOCKED]' : rhythmSyncEnabled ? '• [RHYTHM SYNC ACTIVE]' : ''}`,
+          : `BEAT: ${beatFreq.toFixed(1)} Hz [${activeBand}] • AM INTENSITY: ${Math.round(intensity * 100)}% ${masterSyncEnabled ? '• [MASTER SYNC]' : rhythmSyncEnabled ? '• [RHYTHM SYNC]' : ''}`,
         8,
         14
       );
@@ -303,15 +310,15 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [isOpen, isPlaying, carrierFreq, syncedCarrierFreq, beatFreq, activeBand, bandInfo.color, rhythmSyncEnabled, masterSyncEnabled, detectedBpm, isCrossfading, tempoRatio]);
-
-  if (!isOpen) return null;
+  }, [isOpen, isPlaying, carrierFreq, syncedCarrierFreq, beatFreq, intensity, activeBand, bandInfo.color, rhythmSyncEnabled, masterSyncEnabled, detectedBpm, isCrossfading, tempoRatio]);
 
   // Smooth Crossfade Handler for Monroe Gateway Presets
   const handleSelectMonroePreset = (preset: FocusLevelPreset) => {
     setSelectedPresetId(preset.id);
     setCarrierFreq(preset.carrierFreq);
     setBeatFreq(preset.beatFreq);
+    const targetIntensity = preset.intensity ?? intensity;
+    setIntensity(targetIntensity);
     setWaveform(preset.waveform);
     setNoiseLevel(preset.noiseLevel);
     setSubHarmonics(preset.subHarmonics);
@@ -324,10 +331,42 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
       preset.noiseLevel,
       preset.subHarmonics,
       preset.id,
-      crossfadeDurationMs
+      crossfadeDurationMs,
+      targetIntensity
     );
 
     setSaveSuccessMsg(`CROSSFADED: ${preset.focusLevel} // ${preset.name.toUpperCase()}`);
+    setTimeout(() => setSaveSuccessMsg(null), 2500);
+  };
+
+  // Quick Auto-Configure Frequency Settings by Preset Category
+  const handleQuickAutoConfigureCategory = (catKey: Exclude<PresetCategory, 'ALL'>) => {
+    setSelectedCategory(catKey);
+    const catInfo = PRESET_CATEGORIES[catKey];
+    const matchingPreset = FOCUS_PRESETS.find(p => p.category === catKey);
+    if (matchingPreset) {
+      handleSelectMonroePreset(matchingPreset);
+      setSaveSuccessMsg(`AUTO-CONFIGURED: ${catKey.toUpperCase()} [${matchingPreset.name.toUpperCase()}]`);
+    } else {
+      setCarrierFreq(catInfo.defaultCarrier);
+      setBeatFreq(catInfo.defaultBeat);
+      setWaveform('sine');
+      setNoiseLevel(0.12);
+      setSubHarmonics(true);
+      setSelectedPresetId(null);
+      setCustomMode(false);
+      audioSynth.switchPresetWithCrossfade(
+        catInfo.defaultCarrier,
+        catInfo.defaultBeat,
+        'sine',
+        0.12,
+        true,
+        null,
+        crossfadeDurationMs,
+        intensity
+      );
+      setSaveSuccessMsg(`AUTO-CONFIGURED: ${catKey.toUpperCase()} FREQUENCIES`);
+    }
     setTimeout(() => setSaveSuccessMsg(null), 2500);
   };
 
@@ -336,6 +375,8 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
     setSelectedPresetId(preset.id);
     setCarrierFreq(preset.carrierFreq);
     setBeatFreq(preset.beatFreq);
+    const targetIntensity = preset.intensity ?? intensity;
+    setIntensity(targetIntensity);
     setWaveform(preset.waveform);
     setNoiseLevel(preset.noiseLevel);
     setSubHarmonics(preset.subHarmonics);
@@ -348,7 +389,8 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
       preset.noiseLevel,
       preset.subHarmonics,
       preset.id,
-      crossfadeDurationMs
+      crossfadeDurationMs,
+      targetIntensity
     );
 
     setSaveSuccessMsg(`CROSSFADED: ${preset.name.toUpperCase()}`);
@@ -363,6 +405,7 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
       name: newPresetName.trim(),
       carrierFreq,
       beatFreq,
+      intensity,
       band: activeBand,
       waveform,
       noiseLevel,
@@ -393,7 +436,8 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
         waveform,
         noiseLevel,
         subHarmonics,
-        selectedPresetId
+        selectedPresetId,
+        intensity
       );
       setIsPlaying(true);
       if (masterSyncEnabled) {
@@ -402,6 +446,14 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
         audioSynth.setRhythmSync(true, rhythmHarmonic);
       }
     }
+  };
+
+  const handleIntensityChange = (val: number) => {
+    const clamped = Math.max(0, Math.min(1, val));
+    setIntensity(clamped);
+    setSelectedPresetId(null);
+    setCustomMode(true);
+    audioSynth.setIntensity(clamped);
   };
 
   const handleToggleMasterSync = () => {
@@ -531,7 +583,7 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
     setSelectedPresetId(null);
     setCustomMode(true);
     if (isPlaying) {
-      audioSynth.updateBinaural(val, beatFreq, waveform, noiseLevel, subHarmonics);
+      audioSynth.updateBinaural(val, beatFreq, waveform, noiseLevel, subHarmonics, intensity);
     }
   };
 
@@ -546,7 +598,7 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
     setSelectedPresetId(null);
     setCustomMode(true);
     if (isPlaying) {
-      audioSynth.updateBinaural(carrierFreq, val, waveform, noiseLevel, subHarmonics);
+      audioSynth.updateBinaural(carrierFreq, val, waveform, noiseLevel, subHarmonics, intensity);
     }
   };
 
@@ -555,14 +607,14 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
     setSelectedPresetId(null);
     setCustomMode(true);
     if (isPlaying) {
-      audioSynth.startBinaural(carrierFreq, beatFreq, type, noiseLevel, subHarmonics, null);
+      audioSynth.startBinaural(carrierFreq, beatFreq, type, noiseLevel, subHarmonics, null, intensity);
     }
   };
 
   const handleNoiseChange = (val: number) => {
     setNoiseLevel(val);
     if (isPlaying) {
-      audioSynth.updateBinaural(effectiveCarrier, beatFreq, waveform, val, subHarmonics);
+      audioSynth.updateBinaural(effectiveCarrier, beatFreq, waveform, val, subHarmonics, intensity);
     }
   };
 
@@ -570,11 +622,13 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
     const next = !subHarmonics;
     setSubHarmonics(next);
     if (isPlaying) {
-      audioSynth.startBinaural(effectiveCarrier, beatFreq, waveform, noiseLevel, next, selectedPresetId);
+      audioSynth.startBinaural(effectiveCarrier, beatFreq, waveform, noiseLevel, next, selectedPresetId, intensity);
     }
   };
 
   const activePreset = FOCUS_PRESETS.find(p => p.id === selectedPresetId);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[260] bg-black/95 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 font-mono select-none">
@@ -821,19 +875,81 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
             </button>
           </div>
 
-          {/* TAB 1: FOCUS PRESETS (NAMED PROFILES & MONROE LEVELS WITH SMOOTH CROSSFADE) */}
+          {/* TAB 1: FOCUS PRESETS (CATEGORY MATRIX, NAMED PROFILES & MONROE LEVELS WITH SMOOTH CROSSFADE) */}
           {activeTab === 'PRESETS' && (
             <div className="space-y-4">
+
+              {/* --- START NEW CODE: PRESET CATEGORIES QUICK AUTO-CONFIGURE BAR --- */}
+              <div className="border border-[#222] bg-[#050505] p-2.5 sm:p-3 space-y-2.5 shadow-[0_0_20px_rgba(0,0,0,0.8)]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-[#222] pb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-[#E056FD]" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">
+                      PRESET CATEGORIES // AUTO-CONFIGURE FREQUENCY MATRIX
+                    </span>
+                  </div>
+                  <span className="text-[8px] sm:text-[9px] text-gray-400">
+                    Click any category to auto-configure frequency settings instantly.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('ALL')}
+                    className={`py-2 px-2 border text-[9px] sm:text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${
+                      selectedCategory === 'ALL'
+                        ? 'border-white bg-white/20 text-white shadow-[0_0_12px_rgba(255,255,255,0.3)]'
+                        : 'border-[#222] bg-black text-gray-400 hover:border-gray-500 hover:text-white'
+                    }`}
+                  >
+                    <Bookmark size={11} />
+                    <span>ALL ({FOCUS_PRESETS.length})</span>
+                  </button>
+
+                  {(['Concentration', 'Deep Sleep', 'Deep Theta', 'Meditation & Flow'] as Exclude<PresetCategory, 'ALL'>[]).map((catKey) => {
+                    const cat = PRESET_CATEGORIES[catKey];
+                    const isSelected = selectedCategory === catKey;
+                    const catCount = FOCUS_PRESETS.filter(p => p.category === catKey).length;
+
+                    return (
+                      <button
+                        key={catKey}
+                        type="button"
+                        onClick={() => handleQuickAutoConfigureCategory(catKey)}
+                        className={`py-2 px-1.5 border text-[9px] sm:text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1 select-none ${
+                          isSelected
+                            ? 'text-black font-black'
+                            : 'bg-black/90 hover:bg-black text-gray-300'
+                        }`}
+                        style={{
+                          borderColor: cat.color,
+                          backgroundColor: isSelected ? cat.color : undefined,
+                          boxShadow: isSelected ? `0 0 15px ${cat.color}66` : undefined
+                        }}
+                      >
+                        {catKey === 'Concentration' && <Zap size={11} className={isSelected ? 'text-black' : ''} style={{ color: !isSelected ? cat.color : undefined }} />}
+                        {catKey === 'Deep Sleep' && <Moon size={11} className={isSelected ? 'text-black' : ''} style={{ color: !isSelected ? cat.color : undefined }} />}
+                        {catKey === 'Deep Theta' && <Sparkles size={11} className={isSelected ? 'text-black' : ''} style={{ color: !isSelected ? cat.color : undefined }} />}
+                        {catKey === 'Meditation & Flow' && <Waves size={11} className={isSelected ? 'text-black' : ''} style={{ color: !isSelected ? cat.color : undefined }} />}
+                        <span className="truncate">{cat.label} ({catCount})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* --- END NEW CODE: PRESET CATEGORIES QUICK AUTO-CONFIGURE BAR --- */}
+
               {/* SAVED NAMED FOCUS PROFILES (DEEP WORK, MEDITATION, HIGH-ENERGY, ETC.) */}
               <div className="border border-[#222] bg-[#080808] p-3 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#222] pb-2">
                   <div>
                     <span className="text-xs font-bold text-white uppercase flex items-center gap-1.5">
                       <Sparkles size={14} className="text-[#FFD700]" />
-                      NAMED FOCUS PROFILES (SMOOTH CROSSFADE ACTIVE)
+                      SAVED NAMED FOCUS PROFILES
                     </span>
                     <p className="text-[8px] sm:text-[9px] text-gray-400 mt-0.5">
-                      Switch seamlessly between Deep Work, Meditation, and High-Energy states with automatic fatigue dampening.
+                      Custom saved frequency profiles with seamless crossfade intensity.
                     </p>
                   </div>
                   {saveSuccessMsg && (
@@ -927,53 +1043,86 @@ export const BinauralModal: React.FC<BinauralModalProps> = ({
                 </div>
               </div>
 
-              {/* MONROE GATEWAY EXPERIENCE FOCUS LEVELS */}
-              <div className="space-y-1.5">
-                <span className="text-[10px] sm:text-xs font-bold text-[#E056FD] tracking-wider uppercase flex items-center gap-1.5">
-                  <Sparkles size={13} />
-                  MONROE GATEWAY EXPERIENCE PROTOCOLS (FATIGUE-SAFE CROSSFADE)
-                </span>
+              {/* CATEGORY-GROUPED FOCUS LEVEL PRESETS */}
+              <div className="space-y-4">
+                {(['Concentration', 'Deep Sleep', 'Deep Theta', 'Meditation & Flow'] as Exclude<PresetCategory, 'ALL'>[])
+                  .filter(catKey => selectedCategory === 'ALL' || selectedCategory === catKey)
+                  .map((catKey) => {
+                    const catInfo = PRESET_CATEGORIES[catKey];
+                    const catPresets = FOCUS_PRESETS.filter(p => p.category === catKey);
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-2">
-                  {FOCUS_PRESETS.map((preset) => {
-                    const isSelected = selectedPresetId === preset.id;
-                    const pBand = BRAINWAVE_BANDS[preset.band];
                     return (
-                      <button
-                        key={preset.id}
-                        onClick={() => handleSelectMonroePreset(preset)}
-                        className={`p-2 border text-left flex flex-col justify-between transition-all group relative overflow-hidden ${
-                          isSelected
-                            ? 'border-[#FF003C] bg-[#FF003C]/15 shadow-[0_0_15px_rgba(255,0,60,0.25)] text-white'
-                            : 'border-[#222] bg-[#080808] hover:border-[#E056FD] hover:bg-[#E056FD]/10 text-gray-300'
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-center justify-between text-[8px] sm:text-[9px] font-bold">
-                            <span className="text-[#FF003C] font-mono">{preset.focusLevel}</span>
-                            <span
-                              className="px-1 py-0.5 border text-[7px] uppercase"
-                              style={{ borderColor: pBand.color, color: pBand.color }}
-                            >
-                              {preset.band} {preset.beatFreq}Hz
-                            </span>
+                      <div key={catKey} className="border border-[#222] bg-[#060606] p-3 space-y-2.5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-[#222] pb-2">
+                          <div className="flex items-center gap-2">
+                            {catKey === 'Concentration' && <Zap size={14} style={{ color: catInfo.color }} />}
+                            {catKey === 'Deep Sleep' && <Moon size={14} style={{ color: catInfo.color }} />}
+                            {catKey === 'Deep Theta' && <Sparkles size={14} style={{ color: catInfo.color }} />}
+                            {catKey === 'Meditation & Flow' && <Waves size={14} style={{ color: catInfo.color }} />}
+                            <div>
+                              <span className="text-xs font-black uppercase tracking-wider text-white" style={{ color: catInfo.color }}>
+                                {catInfo.label} PRESETS
+                              </span>
+                              <p className="text-[8px] sm:text-[9px] text-gray-400 mt-0.5">
+                                {catInfo.desc}
+                              </p>
+                            </div>
                           </div>
-                          <div className="text-[10px] sm:text-[11px] font-bold mt-1 leading-snug truncate text-white">
-                            {preset.name}
-                          </div>
-                          <div className="text-[8px] text-gray-400 mt-0.5 leading-tight line-clamp-2">
-                            {preset.subtitle}
-                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleQuickAutoConfigureCategory(catKey)}
+                            className="px-2.5 py-1 text-[8px] sm:text-[9px] uppercase font-bold border transition-all flex items-center gap-1 shrink-0"
+                            style={{ borderColor: catInfo.color, color: catInfo.color }}
+                          >
+                            <Sparkles size={10} />
+                            <span>AUTO-CONFIGURE {catKey.toUpperCase()}</span>
+                          </button>
                         </div>
 
-                        <div className="mt-2 pt-1 border-t border-[#222] flex items-center justify-between text-[7px] sm:text-[8px] text-gray-500">
-                          <span>Carrier: {preset.carrierFreq}Hz</span>
-                          <span className="text-gray-400">{preset.waveform}</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {catPresets.map((preset) => {
+                            const isSelected = selectedPresetId === preset.id;
+                            const pBand = BRAINWAVE_BANDS[preset.band];
+                            return (
+                              <button
+                                key={preset.id}
+                                onClick={() => handleSelectMonroePreset(preset)}
+                                className={`p-2.5 border text-left flex flex-col justify-between transition-all group relative overflow-hidden ${
+                                  isSelected
+                                    ? 'border-[#FF003C] bg-[#FF003C]/15 shadow-[0_0_15px_rgba(255,0,60,0.25)] text-white'
+                                    : 'border-[#222] bg-[#090909] hover:border-[#E056FD] hover:bg-[#E056FD]/10 text-gray-300'
+                                }`}
+                              >
+                                <div>
+                                  <div className="flex items-center justify-between text-[8px] sm:text-[9px] font-bold">
+                                    <span className="text-[#FF003C] font-mono">{preset.focusLevel}</span>
+                                    <span
+                                      className="px-1.5 py-0.5 border text-[7px] uppercase font-bold"
+                                      style={{ borderColor: pBand.color, color: pBand.color }}
+                                    >
+                                      {preset.band} {preset.beatFreq}Hz
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] sm:text-[11px] font-bold mt-1 leading-snug truncate text-white">
+                                    {preset.name}
+                                  </div>
+                                  <div className="text-[8px] text-gray-400 mt-0.5 leading-tight line-clamp-2">
+                                    {preset.subtitle}
+                                  </div>
+                                </div>
+
+                                <div className="mt-2 pt-1 border-t border-[#222] flex items-center justify-between text-[7px] sm:text-[8px] text-gray-500">
+                                  <span>Carrier: {preset.carrierFreq}Hz</span>
+                                  <span className="text-gray-400">{preset.waveform}</span>
+                                </div>
+                              </button>
+                            );
+                          })}
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
-                </div>
               </div>
             </div>
           )}

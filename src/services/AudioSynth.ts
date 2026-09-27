@@ -32,12 +32,16 @@ export class AudioSynth {
   private binauralSubOsc: OscillatorNode | null = null;
   private binauralNoiseSource: AudioBufferSourceNode | null = null;
   private binauralNoiseGain: GainNode | null = null;
+  private binauralAmGainNode: GainNode | null = null;
+  private binauralAmLfo: OscillatorNode | null = null;
+  private binauralAmLfoGain: GainNode | null = null;
   private isBinauralPlaying: boolean = false;
   private binauralVolume: number = 0.5;
   private isBinauralMuted: boolean = false;
   private activePresetId: string | null = 'focus-10';
   private currentCarrierFreq: number = 136.1;
   private currentBeatFreq: number = 7.0;
+  private currentIntensity: number = 0.70; // Dynamic amplitude modulation depth (0.0 to 1.0)
   private currentWaveform: OscillatorType = 'sine';
   private currentNoiseLevel: number = 0.12;
   private currentSubHarmonics: boolean = true;
@@ -164,12 +168,32 @@ export class AudioSynth {
       activePresetId: this.activePresetId,
       carrierFreq: this.currentCarrierFreq,
       beatFreq: this.currentBeatFreq,
+      intensity: this.currentIntensity,
       waveform: this.currentWaveform,
       noiseLevel: this.currentNoiseLevel,
       subHarmonics: this.currentSubHarmonics,
       volume: this.binauralVolume,
       isMuted: this.isBinauralMuted,
     };
+  }
+
+  setIntensity(intensity: number) {
+    this.currentIntensity = Math.max(0, Math.min(1, intensity));
+    if (this.ctx && this.isBinauralPlaying) {
+      const now = this.ctx.currentTime;
+      const modDepth = this.currentIntensity * 0.45;
+      const baseGain = 1.0 - modDepth;
+      if (this.binauralAmGainNode) {
+        this.binauralAmGainNode.gain.setTargetAtTime(baseGain, now, 0.05);
+      }
+      if (this.binauralAmLfoGain) {
+        this.binauralAmLfoGain.gain.setTargetAtTime(modDepth, now, 0.05);
+      }
+    }
+  }
+
+  getIntensity(): number {
+    return this.currentIntensity;
   }
 
   stopBinaural() {
@@ -184,6 +208,19 @@ export class AudioSynth {
         this.binauralRightOsc.stop();
         this.binauralRightOsc.disconnect();
         this.binauralRightOsc = null;
+      }
+      if (this.binauralAmLfo) {
+        this.binauralAmLfo.stop();
+        this.binauralAmLfo.disconnect();
+        this.binauralAmLfo = null;
+      }
+      if (this.binauralAmLfoGain) {
+        this.binauralAmLfoGain.disconnect();
+        this.binauralAmLfoGain = null;
+      }
+      if (this.binauralAmGainNode) {
+        this.binauralAmGainNode.disconnect();
+        this.binauralAmGainNode = null;
       }
       if (this.binauralSubOsc) {
         this.binauralSubOsc.stop();
@@ -211,7 +248,8 @@ export class AudioSynth {
     waveform: OscillatorType = 'sine',
     noiseLevel: number = 0.12,
     subHarmonics: boolean = true,
-    presetId: string | null = null
+    presetId: string | null = null,
+    intensity?: number
   ) {
     this.init();
     if (!this.ctx || !this.binauralGainNode) return;
@@ -221,6 +259,11 @@ export class AudioSynth {
 
     // Stop any existing binaural nodes before spawning fresh channels
     this.stopBinaural();
+
+    if (intensity !== undefined) {
+      this.currentIntensity = Math.max(0, Math.min(1, intensity));
+    }
+    const currentIntensity = this.currentIntensity;
 
     this.baseCarrierFreq = carrierFreq;
     if (this.masterSyncEnabled) {
@@ -265,12 +308,33 @@ export class AudioSynth {
       rightOsc.connect(rightGain);
       rightGain.connect(merger, 0, 1); // Route to Right Channel
 
-      merger.connect(this.binauralGainNode);
+      // Amplitude Modulation (AM Depth / Intensity Modulator)
+      const amGain = this.ctx.createGain();
+      const modDepth = currentIntensity * 0.45;
+      const amBaseGain = 1.0 - modDepth;
+      amGain.gain.setValueAtTime(amBaseGain, this.ctx.currentTime);
+
+      const amLfo = this.ctx.createOscillator();
+      amLfo.type = 'sine';
+      amLfo.frequency.setValueAtTime(beatFreq, this.ctx.currentTime);
+
+      const amLfoGain = this.ctx.createGain();
+      amLfoGain.gain.setValueAtTime(modDepth, this.ctx.currentTime);
+
+      amLfo.connect(amLfoGain);
+      amLfoGain.connect(amGain.gain);
+      amLfo.start();
+
+      merger.connect(amGain);
+      amGain.connect(this.binauralGainNode);
 
       leftOsc.start();
       rightOsc.start();
       this.binauralLeftOsc = leftOsc;
       this.binauralRightOsc = rightOsc;
+      this.binauralAmGainNode = amGain;
+      this.binauralAmLfo = amLfo;
+      this.binauralAmLfoGain = amLfoGain;
 
       // Optional Sub-harmonic Grounding Drone (one octave down)
       if (subHarmonics && carrierFreq >= 60) {
@@ -340,18 +404,23 @@ export class AudioSynth {
     noiseLevel: number = 0.12,
     subHarmonics: boolean = true,
     presetId: string | null = null,
-    durationMs?: number
+    durationMs?: number,
+    intensity?: number
   ) {
     this.baseCarrierFreq = carrierFreq;
     const duration = (durationMs ?? this.crossfadeDurationMs) / 1000;
 
+    if (intensity !== undefined) {
+      this.currentIntensity = Math.max(0, Math.min(1, intensity));
+    }
+
     if (!this.isBinauralPlaying || !this.crossfadeEnabled || duration <= 0.05) {
-      this.startBinaural(carrierFreq, beatFreq, waveform, noiseLevel, subHarmonics, presetId);
+      this.startBinaural(carrierFreq, beatFreq, waveform, noiseLevel, subHarmonics, presetId, intensity ?? this.currentIntensity);
       return;
     }
 
     if (!this.ctx || !this.binauralGainNode) {
-      this.startBinaural(carrierFreq, beatFreq, waveform, noiseLevel, subHarmonics, presetId);
+      this.startBinaural(carrierFreq, beatFreq, waveform, noiseLevel, subHarmonics, presetId, intensity ?? this.currentIntensity);
       return;
     }
 
@@ -375,7 +444,7 @@ export class AudioSynth {
     }
 
     this.crossfadeTimer = window.setTimeout(() => {
-      this.startBinaural(carrierFreq, beatFreq, waveform, noiseLevel, subHarmonics, presetId);
+      this.startBinaural(carrierFreq, beatFreq, waveform, noiseLevel, subHarmonics, presetId, intensity ?? this.currentIntensity);
 
       if (this.ctx && this.binauralGainNode) {
         // Frequency-adaptive intensity softening to prevent ear fatigue on higher frequencies
@@ -428,8 +497,13 @@ export class AudioSynth {
     beatFreq: number,
     waveform?: OscillatorType,
     noiseLevel?: number,
-    subHarmonics?: boolean
+    subHarmonics?: boolean,
+    intensity?: number
   ) {
+    if (intensity !== undefined) {
+      this.currentIntensity = Math.max(0, Math.min(1, intensity));
+    }
+
     if (!this.isBinauralPlaying) {
       this.currentCarrierFreq = carrierFreq;
       this.currentBeatFreq = beatFreq;
@@ -452,7 +526,8 @@ export class AudioSynth {
         waveform ?? this.currentWaveform,
         noiseLevel ?? this.currentNoiseLevel,
         subHarmonics ?? this.currentSubHarmonics,
-        this.activePresetId
+        this.activePresetId,
+        this.currentIntensity
       );
       return;
     }
@@ -474,8 +549,14 @@ export class AudioSynth {
     if (this.binauralSubOsc) {
       this.binauralSubOsc.frequency.setTargetAtTime(carrierFreq * 0.5, this.ctx.currentTime, 0.05);
     }
+    if (this.binauralAmLfo) {
+      this.binauralAmLfo.frequency.setTargetAtTime(beatFreq, this.ctx.currentTime, 0.05);
+    }
     if (this.binauralNoiseGain && noiseLevel !== undefined) {
       this.binauralNoiseGain.gain.setTargetAtTime(noiseLevel * 0.25, this.ctx.currentTime, 0.05);
+    }
+    if (intensity !== undefined) {
+      this.setIntensity(intensity);
     }
   }
 

@@ -135,14 +135,17 @@ export const NULL_OMENS: NullOmenDefinition[] = [
 
 // --- START NEW CODE: BINAURAL BEATS & FOCUS LEVELS PROTOCOL ---
 export type BrainwaveBand = 'DELTA' | 'THETA' | 'ALPHA' | 'BETA' | 'GAMMA';
+export type PresetCategory = 'Concentration' | 'Deep Sleep' | 'Deep Theta' | 'Meditation & Flow' | 'ALL';
 
 export interface FocusLevelPreset {
   id: string;
   focusLevel: string;
   name: string;
   subtitle: string;
+  category: Exclude<PresetCategory, 'ALL'>;
   carrierFreq: number;
   beatFreq: number;
+  intensity?: number;
   band: BrainwaveBand;
   waveform: OscillatorType;
   noiseLevel: number;
@@ -156,6 +159,7 @@ export interface BinauralState {
   activePresetId: string | null;
   carrierFreq: number;
   beatFreq: number;
+  intensity: number;
   waveform: OscillatorType;
   noiseLevel: number;
   subHarmonics: boolean;
@@ -178,8 +182,10 @@ export interface DynamicRhythmSyncState {
 export interface SavedFocusPreset {
   id: string;
   name: string;
+  category?: Exclude<PresetCategory, 'ALL'>;
   carrierFreq: number;
   beatFreq: number;
+  intensity?: number;
   band: BrainwaveBand;
   waveform: OscillatorType;
   noiseLevel: number;
