@@ -4,7 +4,7 @@ A 60 FPS bullet-hell engine built entirely in the browser. This project focuses 
 
 ### [Live Demo](https://project-voidshrine-98.vercel.app/)
 
-![VoidMaiden Gameplay](link-to-your-gif-or-screenshot)
+![VoidMaiden Gameplay](<img width="563" height="1218" alt="Image" src="https://github.com/user-attachments/assets/2dd58f05-e3a6-417a-b4fc-6e08edd6be52" />)
 
 ### Tech Stack
 * **Language:** TypeScript
